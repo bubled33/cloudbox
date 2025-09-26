@@ -88,7 +88,7 @@
 
 <p>&nbsp;</p>
 
-![Component Diagram](./architecture.svg)
+![Component Diagram]./docs/architecture.svg)
 
 <p>&nbsp;</p>
 
@@ -98,7 +98,7 @@
 
 <p>&nbsp;</p>
 
-![Component Diagram](./userflow.svg)
+![Component Diagram](./docs/userflow.svg)
 
 <p>&nbsp;</p>
 
@@ -135,7 +135,7 @@
 
 <p>&nbsp;</p>
 
-![ER Diagram](./models.svg)
+![ER Diagram](./docs/models.svg)
 
 <p>&nbsp;</p>
 
