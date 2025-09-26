@@ -106,3 +106,93 @@ It illustrates the relationships between tables and the cardinality of each asso
 <p>&nbsp;</p>
 
 ![ER Diagram](./models.svg)
+
+<p>&nbsp;</p>
+
+## Security / Authentication
+
+The Cloud File Storage system implements **passwordless authentication** and several security measures to protect user data, files, and public links.
+
+### Authentication
+
+- **Magic Links (Passwordless Login)**  
+  - Users authenticate via temporary magic links sent to their email.  
+  - Each magic link contains a **signed token** with an expiration time (TTL).  
+  - Once verified, a **session token (JWT)** is issued for API requests.  
+  - No passwords are stored in the database, reducing the risk of credential leaks.
+
+- **Session Management**  
+  - Sessions are stored in the database with expiration times.  
+  - API requests must include a valid session token in the `Authorization` header.  
+  - Expired sessions require users to request a new magic link.
+
+### Authorization
+
+- **File Access Control**  
+  - Users can only access files they own or files shared via valid public links.  
+  - Database foreign key constraints and application logic enforce ownership rules.
+
+- **Public Links**  
+  - Temporary links have a **TTL ≤ 600 seconds**.  
+  - **Public Link Expirer** automatically deactivates expired links.  
+  - Access via public links bypasses authentication but is limited to read-only operations.
+
+### Data Protection
+
+- **Transport Security**  
+  - All API traffic must use HTTPS.  
+- **File Storage Security**  
+  - S3/MinIO buckets can be configured with server-side encryption.  
+- **Sensitive Data Handling**  
+  - Only minimal metadata is stored in the database; no plaintext passwords.  
+
+> 💡 **Notes:**  
+> - The combination of passwordless login, TTL-based links, and secure transport ensures both usability and security.  
+> - Additional measures, such as 2FA or encryption at rest for files, can be added in future improvements.
+
+<p>&nbsp;</p>
+
+## API Documentation
+
+The Cloud File Storage system exposes a **RESTful API** to manage users, files, file versions, magic links, and public links. All endpoints use **JSON** for request and response payloads.
+
+| Endpoint                     | Method | Description                                         | Request Body / Params | Response |
+|-------------------------------|--------|-----------------------------------------------------|---------------------|---------|
+| `/auth/magic-link`            | POST   | Request a passwordless login link for a user       | `{ "email": "user@example.com" }` | `{ "magic_link": "https://..." }` |
+| `/auth/magic-link/verify`     | POST   | Verify magic link and create a session             | `{ "token": "..." }` | `{ "session_id": "..." }` |
+| `/files/upload`               | POST   | Create a new file record and get upload URL        | `{ "name": "file.pdf", "size": 1024 }` | `{ "file_id": 123, "upload_url": "https://..." }` |
+| `/files/download/{file_id}`   | GET    | Download the latest version of a file             | Path param: `file_id` | File stream |
+| `/files/{file_id}/versions`   | GET    | List all versions of a file                        | Path param: `file_id` | `[ { "version_id": 1, "size": 1024, "created_at": "..." }, ... ]` |
+| `/public-links`               | POST   | Generate a temporary public link for a file       | `{ "file_id": 123, "ttl": 600 }` | `{ "public_link": "https://..." }` |
+| `/public-links/{link_id}`     | GET    | Access a file via public link                      | Path param: `link_id` | File stream |
+| `/files/{file_id}/preview`    | GET    | Get the preview for a file                         | Path param: `file_id` | Image/Thumbnail stream |
+| `/users/me`                   | GET    | Retrieve current user profile                      | Auth token in header | `{ "id": 1, "email": "user@example.com", "files": [...] }` |
+
+> 💡 **Notes:**  
+> - All endpoints require authentication via **session token** except public link access.  
+> - File upload is handled via **pre-signed URLs** for direct S3/MinIO access.  
+> - Preview generation is asynchronous; `/files/{file_id}/preview` may return a placeholder if preview is not ready yet.  
+> - Public links respect `TTL` (max 600 seconds) and expire automatically via **Public Link Expirer**.  
+
+<p>&nbsp;</p>
+
+## Future Improvements / Scalability
+
+The Cloud File Storage system is designed as an MVP with a **monolithic architecture**, but several improvements can be implemented in the future to enhance functionality, performance, and scalability.
+
+| Area                        | Possible Improvements / Enhancements                 | Notes |
+|------------------------------|------------------------------------------------------|-------|
+| **Asynchronous Tasks**       | Add antivirus scanning, notifications (email/webhook), temporary file cleanup | Offload additional heavy tasks to background workers via the queue to keep API responsive |
+| **File Storage / CDN**       | Integrate a CDN for file delivery and preview assets | Improves download speed for end users globally |
+| **Database Scaling**         | Implement read replicas, partitioning, or sharding | Allows handling higher user and file volume while maintaining low latency |
+| **Microservices Transition** | Split monolith into microservices (e.g., API, preview generation, link management) | Provides independent deployment, scaling, and fault isolation |
+| **Advanced Search & Indexing** | Full-text search for file metadata, tags, and content indexing | Improves user experience for large datasets |
+| **Security Enhancements**    | Add encryption at rest for files, 2FA for users, improved token management | Increases protection for sensitive data |
+| **Monitoring / Observability** | Implement Prometheus + Grafana for metrics, alerts, and dashboards | Helps detect bottlenecks and maintain uptime ≥ 99.5% |
+| **Horizontal Scaling of Workers** | Deploy multiple Preview Worker and Expirer instances | Ensures processing capacity meets peak demand (up to 10k tasks in queue) |
+
+> 💡 **Notes:**  
+> - These improvements are optional for MVP but planned for future versions.  
+> - The current **Layered + Hexagonal architecture** allows easy refactoring to microservices or scaling individual components without major rewrites.  
+> - Priority should be given to asynchronous task scaling and storage optimization to maintain performance and responsiveness for 1000+ concurrent users.
+
