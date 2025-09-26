@@ -156,23 +156,37 @@ The Cloud File Storage system implements **passwordless authentication** and sev
 
 The Cloud File Storage system exposes a **RESTful API** to manage users, files, file versions, magic links, and public links. All endpoints use **JSON** for request and response payloads.
 
-| Endpoint                     | Method | Description                                         | Request Body / Params | Response |
-|-------------------------------|--------|-----------------------------------------------------|---------------------|---------|
-| `/auth/magic-link`            | POST   | Request a passwordless login link for a user       | `{ "email": "user@example.com" }` | `{ "magic_link": "https://..." }` |
-| `/auth/magic-link/verify`     | POST   | Verify magic link and create a session             | `{ "token": "..." }` | `{ "session_id": "..." }` |
-| `/files/upload`               | POST   | Create a new file record and get upload URL        | `{ "name": "file.pdf", "size": 1024 }` | `{ "file_id": 123, "upload_url": "https://..." }` |
-| `/files/download/{file_id}`   | GET    | Download the latest version of a file             | Path param: `file_id` | File stream |
-| `/files/{file_id}/versions`   | GET    | List all versions of a file                        | Path param: `file_id` | `[ { "version_id": 1, "size": 1024, "created_at": "..." }, ... ]` |
-| `/public-links`               | POST   | Generate a temporary public link for a file       | `{ "file_id": 123, "ttl": 600 }` | `{ "public_link": "https://..." }` |
-| `/public-links/{link_id}`     | GET    | Access a file via public link                      | Path param: `link_id` | File stream |
-| `/files/{file_id}/preview`    | GET    | Get the preview for a file                         | Path param: `file_id` | Image/Thumbnail stream |
-| `/users/me`                   | GET    | Retrieve current user profile                      | Auth token in header | `{ "id": 1, "email": "user@example.com", "files": [...] }` |
+| Endpoint                                   | Method | Description                                         | Request Body / Params | Response |
+|--------------------------------------------|--------|-----------------------------------------------------|---------------------|---------|
+| `/auth/magic-link`                          | POST   | Request a passwordless login link for a user       | `{ "email": "user@example.com" }` | `{ "magic_link": "https://..." }` |
+| `/auth/magic-link/verify`                   | POST   | Verify magic link and create a session             | `{ "token": "..." }` | `{ "session_id": "..." }` |
+| `/files/upload`                             | POST   | Upload a **new file** and create its initial version | `{ "name": "file.pdf", "size": 1024 }` | `{ "file_id": 123, "upload_url": "https://..." }` |
+| `/files/{file_id}/upload`                   | POST   | Upload a **new version** of an existing file       | Path param: `file_id`, `{ "size": 2048 }` | `{ "version_id": 2, "upload_url": "https://..." }` |
+| `/files/{file_id}`                           | GET    | Retrieve file metadata (latest version, owner, name, size, created_at) | Path param: `file_id` | `{ "id": 123, "name": "...", "size": 1024, "owner_id": 1, "latest_version": 2, "created_at": "..." }` |
+| `/files/{file_id}`                           | PATCH  | Update file metadata (name, description)           | Path param: `file_id`, `{ "name": "...", "description": "..." }` | `{ "status": "updated" }` |
+| `/files/download/{file_id}`                 | GET    | Download the **latest version** of a file          | Path param: `file_id` | File stream |
+| `/files/{file_id}/versions`                 | GET    | List all versions of a file                         | Path param: `file_id` | `[ { "version_id": 1, "size": 1024, "created_at": "..." }, ... ]` |
+| `/files/{file_id}/versions/{version_id}`    | GET    | Retrieve metadata of a specific version           | Path param: `file_id`, `version_id` | `{ "version_id": 2, "size": 2048, "created_at": "..." }` |
+| `/files/{file_id}/versions/{version_id}/restore` | POST | Restore a specific version as the latest version   | Path param: `file_id`, `version_id` | `{ "status": "restored" }` |
+| `/files/{file_id}/versions/{version_id}`    | DELETE | Delete a specific version of a file               | Path param: `file_id`, `version_id` | `{ "status": "deleted" }` |
+| `/files/{file_id}/preview`                  | GET    | Get the **preview** for the latest version of a file | Path param: `file_id` | Image/Thumbnail stream |
+| `/files/{file_id}`                           | DELETE | Delete a file and **all its versions**, including previews and public links | Path param: `file_id` | `{ "status": "deleted" }` |
+| `/public-links`                             | POST   | Generate a temporary public link for a file       | `{ "file_id": 123, "ttl": 600 }` | `{ "public_link": "https://..." }` |
+| `/public-links/{link_id}`                   | GET    | Access a file via public link                      | Path param: `link_id` | File stream |
+| `/public-links/{link_id}`                   | DELETE | Delete a specific public link                      | Path param: `link_id` | `{ "status": "deleted" }` |
+| `/users/me`                                 | GET    | Retrieve current user profile                      | Auth token in header | `{ "id": 1, "email": "user@example.com", "files": [...] }` |
 
 > 💡 **Notes:**  
-> - All endpoints require authentication via **session token** except public link access.  
-> - File upload is handled via **pre-signed URLs** for direct S3/MinIO access.  
-> - Preview generation is asynchronous; `/files/{file_id}/preview` may return a placeholder if preview is not ready yet.  
-> - Public links respect `TTL` (max 600 seconds) and expire automatically via **Public Link Expirer**.  
+> - **File Versioning:** Each upload to `/files/{file_id}/upload` creates a new `FileVersion` record, while the main `Files` table keeps metadata for the latest version.  
+> - **Deletion:**  
+>   - `/files/{file_id}` removes the main file, all versions, previews, and associated public links (`ON DELETE CASCADE`).  
+>   - `/files/{file_id}/versions/{version_id}` deletes a single version.  
+>   - `/public-links/{link_id}` allows manual removal of a single public link.  
+> - **Restore Version:** `/files/{file_id}/versions/{version_id}/restore` sets a previous version as the latest version.  
+> - **Preview Generation:** Previews are generated asynchronously; they may be temporarily unavailable after a new version is uploaded.  
+> - **Public Links:** Respect `TTL ≤ 600 seconds` and expire automatically via the **Public Link Expirer**.  
+> - All endpoints except public links require authentication via session token.
+
 
 <p>&nbsp;</p>
 
