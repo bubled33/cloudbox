@@ -86,6 +86,30 @@ This structure ensures clear separation of responsibilities, testability, and ma
 
 <p>&nbsp;</p>
 
+## User Flow
+
+The following diagram illustrates the key user scenario in **Cloud File Storage**: uploading a file and generating a temporary public link.  
+
+<p>&nbsp;</p>
+
+![Component Diagram](./userflow.svg)
+
+<p>&nbsp;</p>
+
+**Explanation of Components:**
+
+- **User / App** – initiates actions such as login and file upload.  
+- **DB: Files / FileVersions** – stores metadata and version history.  
+- **S3 / Object Storage** – stores actual file content and generated previews.  
+- **Queue: Preview Tasks** – manages asynchronous preview generation.  
+- **Preview Worker** – consumes tasks from the queue to generate previews.  
+- **Generate Public Link** – creates temporary links for file sharing.  
+
+> ⚠️ **Note:** Only the **upload file** and **generate public link** endpoints are shown in this flow.  
+> The full system contains additional endpoints (versioning, download, deletion, etc.), but they are omitted here for clarity, focusing on the main user interaction path.
+
+<p>&nbsp;</p>
+
 ## ER Diagram
 
 The diagram below shows the main entities of the **Cloud File Storage** system (Google Drive Lite), including users, files, file versions, sessions, magic links, and public links.  
@@ -163,7 +187,7 @@ The Cloud File Storage system exposes a **RESTful API** to manage users, files, 
 | `/files/upload`                             | POST   | Upload a **new file** and create its initial version | `{ "name": "file.pdf", "size": 1024 }` | `{ "file_id": 123, "upload_url": "https://..." }` |
 | `/files/{file_id}/upload`                   | POST   | Upload a **new version** of an existing file       | Path param: `file_id`, `{ "size": 2048 }` | `{ "version_id": 2, "upload_url": "https://..." }` |
 | `/files/{file_id}`                           | GET    | Retrieve file metadata (latest version, owner, name, size, created_at) | Path param: `file_id` | `{ "id": 123, "name": "...", "size": 1024, "owner_id": 1, "latest_version": 2, "created_at": "..." }` |
-| `/files/{file_id}`                           | PATCH  | Update file metadata (name, description)           | Path param: `file_id`, `{ "name": "...", "description": "..." }` | `{ "status": "updated" }` |
+| `/files/{file_id}/rename`                   | PATCH  | Rename a file                                      | Path param: `file_id`, `{ "name": "new_name.pdf" }` | `{ "status": "renamed", "new_name": "new_name.pdf" }` |
 | `/files/download/{file_id}`                 | GET    | Download the **latest version** of a file          | Path param: `file_id` | File stream |
 | `/files/{file_id}/versions`                 | GET    | List all versions of a file                         | Path param: `file_id` | `[ { "version_id": 1, "size": 1024, "created_at": "..." }, ... ]` |
 | `/files/{file_id}/versions/{version_id}`    | GET    | Retrieve metadata of a specific version           | Path param: `file_id`, `version_id` | `{ "version_id": 2, "size": 2048, "created_at": "..." }` |
@@ -186,7 +210,6 @@ The Cloud File Storage system exposes a **RESTful API** to manage users, files, 
 > - **Preview Generation:** Previews are generated asynchronously; they may be temporarily unavailable after a new version is uploaded.  
 > - **Public Links:** Respect `TTL ≤ 600 seconds` and expire automatically via the **Public Link Expirer**.  
 > - All endpoints except public links require authentication via session token.
-
 
 <p>&nbsp;</p>
 
