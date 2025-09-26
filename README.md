@@ -21,6 +21,33 @@
 | Public link TTL             | $TTL_{link}$     | $\leq 600 \text{ s}$   |
 
 <p>&nbsp;</p>
+## Technology Stack
+
+The Cloud File Storage system is built using a **modern Go ecosystem**, combining high-performance web frameworks, reliable databases, scalable queues, and background workers.
+
+| Layer / Purpose               | Technology / Library                          | Notes / Usage |
+|-------------------------------|-----------------------------------------------|---------------|
+| **Programming Language**      | Go (Golang)                                   | Main backend language, compiles to a single binary, suitable for high-performance services |
+| **Web Framework / Router**    | [Gin](https://github.com/gin-gonic/gin)       | High-performance HTTP framework, lightweight and convenient for REST APIs |
+| **Database**                  | PostgreSQL                                    | Relational database for storing users, files, file versions, and links |
+| **ORM / Database Access**     | [GORM](https://gorm.io/)                       | Popular Go ORM, supports migrations and table relationships |
+| **Object Storage**            | S3 / MinIO                                    | File storage (up to 10 GB), MinIO for local development, S3 for production |
+| **Queue / Message Broker**    | Apache Kafka                                  | Asynchronous task processing (Preview Worker, Public Link Expirer) |
+| **Authentication / Magic Link** | JWT / custom magic link flow                 | Passwordless login via temporary links, tokens stored in the database |
+| **Background Workers**        | Go routines + Kafka consumers                 | Asynchronous task processing, scalable with multiple worker instances |
+| **Configuration / Env**       | Viper / Envconfig                             | Configuration management, environment variables |
+| **Logging / Monitoring**      | Logrus / Zap                                  | Logging for debugging and monitoring |
+| **Testing / QA**              | Go test, Testify                               | Unit tests and integration tests |
+| **Containerization / Deployment** | Docker / Docker Compose                     | Simplified local development and production deployment |
+| **CI/CD**                     | GitHub Actions / GitLab CI                     | Automated build, tests, and deployment |
+
+> 💡 **Notes:**  
+> - **Gin + GORM** is a lightweight and standard stack for Go web services.  
+> - **Kafka** allows scaling background workers and handling high task volumes asynchronously.  
+> - **MinIO** is used for local development instead of S3.  
+> - **Workers** use Go routines and Kafka consumers to keep API responsive while processing heavy tasks asynchronously.
+
+<p>&nbsp;</p>
 
 ## Architecture
 
