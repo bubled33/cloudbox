@@ -21,6 +21,7 @@
 | Public link TTL             | $TTL_{link}$     | $\leq 600 \text{ s}$   |
 
 <p>&nbsp;</p>
+
 ## Technology Stack
 
 The Cloud File Storage system is built using a **modern Go ecosystem**, combining high-performance web frameworks, reliable databases, scalable queues, and background workers.
