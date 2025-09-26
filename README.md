@@ -1,3 +1,9 @@
+# Cloud File Storage (Google Drive Lite)
+
+> **Language / Язык**: **EN** | [RU](./README_RU.md)
+
+---
+
 ## Introduction
 
 **Project**: Cloud File Storage (Google Drive Lite)
