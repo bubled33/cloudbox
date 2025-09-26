@@ -1,6 +1,6 @@
 # Cloud File Storage (Google Drive Lite)
 
-> **Language / Язык**: **EN** | [RU](./README_RU.md)
+> **Language / Язык**: **EN** | [RU](./docs/README_RU.md)
 
 ---
 
@@ -88,7 +88,7 @@ This structure ensures clear separation of responsibilities, testability, and ma
 
 <p>&nbsp;</p>
 
-![Component Diagram](./architecture.svg)
+![Component Diagram](./docs/architecture.svg)
 
 <p>&nbsp;</p>
 
@@ -98,7 +98,7 @@ The following diagram illustrates the key user scenario in **Cloud File Storage*
 
 <p>&nbsp;</p>
 
-![Component Diagram](./userflow.svg)
+![Component Diagram](./docs/userflow.svg)
 
 <p>&nbsp;</p>
 
@@ -135,7 +135,7 @@ It illustrates the relationships between tables and the cardinality of each asso
 
 <p>&nbsp;</p>
 
-![ER Diagram](./models.svg)
+![ER Diagram](./docs/models.svg)
 
 <p>&nbsp;</p>
 
