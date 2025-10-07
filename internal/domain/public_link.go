@@ -12,6 +12,7 @@ type PublicLink struct {
 	CreatedByUserID uuid.UUID
 
 	TokenHash string
+	IsExpired bool
 
 	CreatedAt time.Time
 	UpdatedAt time.Time
@@ -36,6 +37,7 @@ func NewPublicLink(
 	}
 }
 
-func (p *PublicLink) IsExpired() bool {
-	return time.Now().After(p.ExpiresAt)
+func (p *PublicLink) MarkAsExpired() {
+	p.ExpiresAt = time.Now()
+	p.IsExpired = true
 }

@@ -26,9 +26,11 @@ type UserRepository interface {
 }
 
 type SessionRepository interface {
+	GetAll() ([]*Session, error)
 	GetByID(id uuid.UUID) (*Session, error)
 	GetByUserID(userID uuid.UUID) ([]*Session, error)
 	Save(session *Session) error
+	Delete(id uuid.UUID) error
 	Revoke(sessionID uuid.UUID) error
 	CleanupExpired(before time.Time) error
 }
