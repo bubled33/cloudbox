@@ -1,7 +1,9 @@
 package domain
 
+import "time"
+
 type Storage interface {
-	UploadFile(key string, data []byte) error
-	DonwnloadFile(key string) ([]byte, error)
+	GenerateUploadURL(key string, expiresIn time.Duration) (string, error)
+	GenerateDownloadURL(key string, expiresIn time.Duration) (string, error)
 	DeleteFile(key string) error
 }
