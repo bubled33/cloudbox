@@ -17,12 +17,13 @@ type MagicLink struct {
 
 	Ip net.IP
 
-	IsUsed bool
+	IsUsed    bool
+	IsExpired bool
 
 	UsedAt    *time.Time
 	CreatedAt time.Time
 	UpdatedAt time.Time
-	ExpiresAt time.Time
+	ExpiredAt time.Time
 }
 
 func NewMagicLink(
@@ -45,7 +46,6 @@ func NewMagicLink(
 		UsedAt:     nil,
 		CreatedAt:  now,
 		UpdatedAt:  now,
-		ExpiresAt:  expiresAt,
 	}
 }
 
@@ -56,6 +56,9 @@ func (m *MagicLink) MarkAsUsed() {
 	m.UpdatedAt = now
 }
 
-func (m *MagicLink) IsExpired() bool {
-	return time.Now().After(m.ExpiresAt)
+func (m *MagicLink) MarkAsExpired() {
+	now := time.Now()
+	m.IsExpired = true
+	m.ExpiredAt = now
+	m.UpdatedAt = now
 }

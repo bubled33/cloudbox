@@ -3,7 +3,7 @@ package domain
 import (
 	"time"
 
-	uuid "github.com/google/uuid"
+	"github.com/google/uuid"
 )
 
 type PublicLink struct {
@@ -16,7 +16,7 @@ type PublicLink struct {
 
 	CreatedAt time.Time
 	UpdatedAt time.Time
-	ExpiresAt time.Time
+	ExpiredAt time.Time
 }
 
 func NewPublicLink(
@@ -26,18 +26,21 @@ func NewPublicLink(
 	expiresAt time.Time,
 ) *PublicLink {
 	now := time.Now()
+
 	return &PublicLink{
 		ID:              uuid.New(),
 		FileID:          fileID,
 		CreatedByUserID: createdByUserID,
 		TokenHash:       tokenHash,
+		IsExpired:       false,
 		CreatedAt:       now,
 		UpdatedAt:       now,
-		ExpiresAt:       expiresAt,
 	}
 }
 
 func (p *PublicLink) MarkAsExpired() {
-	p.ExpiresAt = time.Now()
+	now := time.Now()
 	p.IsExpired = true
+	p.ExpiredAt = now
+	p.UpdatedAt = now
 }

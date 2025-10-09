@@ -88,3 +88,23 @@ func (fv *FileVersion) SetVersionNum(versionNum int) {
 	fv.VersionNum = versionNum
 	fv.UpdatedAt = time.Now()
 }
+
+func (f *FileVersion) MarkUploaded() {
+	f.Status = FileStatusUploaded
+	f.UpdatedAt = time.Now()
+}
+
+func (f *FileVersion) MarkProcessing() {
+	f.Status = FileStatusProcessing
+	f.UpdatedAt = time.Now()
+}
+
+func (f *FileVersion) MarkReady() {
+	f.Status = FileStatusReady
+	f.UpdatedAt = time.Now()
+}
+
+func (f *FileVersion) MarkFailed() {
+	f.Status = FileStatusFailed
+	f.UpdatedAt = time.Now()
+}

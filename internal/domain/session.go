@@ -58,3 +58,7 @@ func (s *Session) UpdateLastUsed() {
 	s.LastUsedAt = time.Now()
 	s.UpdatedAt = time.Now()
 }
+
+func (s *Session) IsExpired() bool {
+	return time.Now().After(s.ExpiresAt)
+}
