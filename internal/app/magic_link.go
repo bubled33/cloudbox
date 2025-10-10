@@ -1,7 +1,6 @@
 package app
 
 import (
-	"errors"
 	"net"
 	"time"
 
@@ -9,26 +8,28 @@ import (
 	"github.com/yourusername/cloud-file-storage/internal/domain"
 )
 
-var ErrMagicLinkNotFound = errors.New("magic link not found")
-
 const magicLinkTTL = 5 * time.Minute
 
 type MagicLinkService struct {
-	magicLinkRepo domain.MagicLinkRepository
-	queue         domain.Expirer
+	queryRepo   domain.MagicLinkQueryRepository
+	commandRepo domain.MagicLinkCommandRepository
+	queue       domain.Expirer
 }
 
 func NewMagicLinkService(
-	magicLinkRepo domain.MagicLinkRepository,
+	queryRepo domain.MagicLinkQueryRepository,
+	commandRepo domain.MagicLinkCommandRepository,
 	queue domain.Expirer,
 ) *MagicLinkService {
 	return &MagicLinkService{
-		magicLinkRepo: magicLinkRepo,
-		queue:         queue,
+		queryRepo:   queryRepo,
+		commandRepo: commandRepo,
+		queue:       queue,
 	}
 }
 
-// Создание новой магической ссылки
+// --- Commands ---
+
 func (s *MagicLinkService) Create(
 	userID uuid.UUID,
 	tokenHash string,
@@ -39,7 +40,7 @@ func (s *MagicLinkService) Create(
 	expiresAt := time.Now().Add(magicLinkTTL)
 	link := domain.NewMagicLink(userID, tokenHash, deviceInfo, purpose, ip, expiresAt)
 
-	if err := s.magicLinkRepo.Save(link); err != nil {
+	if err := s.commandRepo.Save(link); err != nil {
 		return nil, err
 	}
 
@@ -50,43 +51,8 @@ func (s *MagicLinkService) Create(
 	return link, nil
 }
 
-// Получение ссылки по ID
-func (s *MagicLinkService) GetByID(id uuid.UUID) (*domain.MagicLink, error) {
-	link, err := s.magicLinkRepo.GetByID(id)
-	if err != nil {
-		return nil, err
-	}
-	if link == nil {
-		return nil, ErrMagicLinkNotFound
-	}
-	return link, nil
-}
-
-// Получение ссылок по пользователю
-func (s *MagicLinkService) GetByUserID(userID uuid.UUID) ([]*domain.MagicLink, error) {
-	return s.magicLinkRepo.GetByUserID(userID)
-}
-
-// Получение ссылки по токену
-func (s *MagicLinkService) GetByTokenHash(tokenHash string) (*domain.MagicLink, error) {
-	link, err := s.magicLinkRepo.GetByTokenHash(tokenHash)
-	if err != nil {
-		return nil, err
-	}
-	if link == nil {
-		return nil, ErrMagicLinkNotFound
-	}
-	return link, nil
-}
-
-// Получение всех ссылок
-func (s *MagicLinkService) GetAll() ([]*domain.MagicLink, error) {
-	return s.magicLinkRepo.GetAll()
-}
-
-// Маркировка ссылки как использованной
 func (s *MagicLinkService) MarkAsUsed(id uuid.UUID) error {
-	link, err := s.magicLinkRepo.GetByID(id)
+	link, err := s.queryRepo.GetByID(id)
 	if err != nil {
 		return err
 	}
@@ -95,12 +61,11 @@ func (s *MagicLinkService) MarkAsUsed(id uuid.UUID) error {
 	}
 
 	link.MarkAsUsed()
-	return s.magicLinkRepo.Save(link)
+	return s.commandRepo.Save(link)
 }
 
-// Истечение ссылки (автоистечение)
 func (s *MagicLinkService) Expire(id uuid.UUID) error {
-	link, err := s.magicLinkRepo.GetByID(id)
+	link, err := s.queryRepo.GetByID(id)
 	if err != nil {
 		return err
 	}
@@ -109,13 +74,11 @@ func (s *MagicLinkService) Expire(id uuid.UUID) error {
 	}
 
 	link.MarkAsExpired()
-
-	return s.magicLinkRepo.Save(link)
+	return s.commandRepo.Save(link)
 }
 
-// Удаление ссылки
 func (s *MagicLinkService) Delete(id uuid.UUID) error {
-	link, err := s.magicLinkRepo.GetByID(id)
+	link, err := s.queryRepo.GetByID(id)
 	if err != nil {
 		return err
 	}
@@ -123,7 +86,7 @@ func (s *MagicLinkService) Delete(id uuid.UUID) error {
 		return ErrMagicLinkNotFound
 	}
 
-	if err := s.magicLinkRepo.Delete(id); err != nil {
+	if err := s.commandRepo.Delete(id); err != nil {
 		return err
 	}
 
@@ -131,9 +94,40 @@ func (s *MagicLinkService) Delete(id uuid.UUID) error {
 	return nil
 }
 
-// Очистка всех просроченных ссылок
+// --- Queries ---
+
+func (s *MagicLinkService) GetByID(id uuid.UUID) (*domain.MagicLink, error) {
+	link, err := s.queryRepo.GetByID(id)
+	if err != nil {
+		return nil, err
+	}
+	if link == nil {
+		return nil, ErrMagicLinkNotFound
+	}
+	return link, nil
+}
+
+func (s *MagicLinkService) GetByUserID(userID uuid.UUID) ([]*domain.MagicLink, error) {
+	return s.queryRepo.GetByUserID(userID)
+}
+
+func (s *MagicLinkService) GetByTokenHash(tokenHash string) (*domain.MagicLink, error) {
+	link, err := s.queryRepo.GetByTokenHash(tokenHash)
+	if err != nil {
+		return nil, err
+	}
+	if link == nil {
+		return nil, ErrMagicLinkNotFound
+	}
+	return link, nil
+}
+
+func (s *MagicLinkService) GetAll() ([]*domain.MagicLink, error) {
+	return s.queryRepo.GetAll()
+}
+
 func (s *MagicLinkService) CleanupExpired() error {
-	links, err := s.magicLinkRepo.GetAll()
+	links, err := s.queryRepo.GetAll()
 	if err != nil {
 		return err
 	}

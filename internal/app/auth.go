@@ -1,16 +1,11 @@
 package app
 
 import (
-	"errors"
 	"net"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/yourusername/cloud-file-storage/internal/domain"
-)
-
-var (
-	ErrInvalidMagicLink = errors.New("invalid or expired magic link")
 )
 
 type AuthService struct {
@@ -27,29 +22,38 @@ func NewAuthService(mlService *MagicLinkService, sService *SessionService, sessi
 	}
 }
 
+// Запрос магической ссылки
 func (a *AuthService) RequestMagicLink(userID uuid.UUID, deviceInfo string, ip net.IP) (*domain.MagicLink, error) {
 	tokenHash := generateTokenHash()
-
-	link, err := a.magicLinkService.Create(userID, tokenHash, deviceInfo, "login", ip)
-	if err != nil {
-		return nil, err
-	}
-
-	return link, nil
+	return a.magicLinkService.Create(userID, tokenHash, deviceInfo, "login", ip)
 }
 
+// Аутентификация по магической ссылке
 func (a *AuthService) Authenticate(tokenHash string, ip net.IP) (*domain.Session, error) {
 	link, err := a.magicLinkService.GetByTokenHash(tokenHash)
-	if err != nil || link.IsUsed || link.IsExpired {
+	if err != nil {
 		return nil, ErrInvalidMagicLink
 	}
 
+	if link.IsUsed || link.IsExpired {
+		return nil, ErrInvalidMagicLink
+	}
+
+	// Маркируем ссылку как использованную
 	if err := a.magicLinkService.MarkAsUsed(link.ID); err != nil {
 		return nil, err
 	}
 
+	// Создаем сессию
 	expiresAt := time.Now().Add(a.sessionTTL)
-	session, err := a.sessionService.Create(link.UserID, generateTokenHash(), generateTokenHash(), link.DeviceInfo, ip, expiresAt)
+	session, err := a.sessionService.Create(
+		link.UserID,
+		generateTokenHash(),
+		generateTokenHash(),
+		link.DeviceInfo,
+		ip,
+		expiresAt,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -57,6 +61,7 @@ func (a *AuthService) Authenticate(tokenHash string, ip net.IP) (*domain.Session
 	return session, nil
 }
 
+// Валидация сессии
 func (a *AuthService) ValidateSession(sessionID uuid.UUID) (*domain.Session, error) {
 	session, err := a.sessionService.GetByID(sessionID)
 	if err != nil {
@@ -64,21 +69,23 @@ func (a *AuthService) ValidateSession(sessionID uuid.UUID) (*domain.Session, err
 	}
 
 	if session.IsRevoked || session.IsExpired() {
-		return nil, errors.New("invalid session")
+		return nil, ErrInvalidSession
 	}
 
-	session.UpdateLastUsed()
-	if err := a.sessionService.sessionRepo.Save(session); err != nil {
+	// Обновляем последнее использование через метод сервиса
+	if err := a.sessionService.Touch(sessionID); err != nil {
 		return nil, err
 	}
 
 	return session, nil
 }
 
+// Отзыв сессии
 func (a *AuthService) RevokeSession(sessionID uuid.UUID) error {
 	return a.sessionService.Revoke(sessionID)
 }
 
+// Вспомогательная функция генерации токена
 func generateTokenHash() string {
 	return uuid.New().String()
 }

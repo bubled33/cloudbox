@@ -1,7 +1,6 @@
 package app
 
 import (
-	"errors"
 	"net"
 	"time"
 
@@ -9,18 +8,22 @@ import (
 	"github.com/yourusername/cloud-file-storage/internal/domain"
 )
 
-var (
-	ErrSessionNotFound = errors.New("session not found")
-	ErrInvalidExpiry   = errors.New("expiresAt must be in the future")
-)
-
 type SessionService struct {
-	sessionRepo domain.SessionRepository
+	queryRepo   domain.SessionQueryRepository
+	commandRepo domain.SessionCommandRepository
 }
 
-func NewSessionService(sessionRepo domain.SessionRepository) *SessionService {
-	return &SessionService{sessionRepo: sessionRepo}
+func NewSessionService(
+	queryRepo domain.SessionQueryRepository,
+	commandRepo domain.SessionCommandRepository,
+) *SessionService {
+	return &SessionService{
+		queryRepo:   queryRepo,
+		commandRepo: commandRepo,
+	}
 }
+
+// --- Commands ---
 
 func (s *SessionService) Create(
 	userID uuid.UUID,
@@ -36,7 +39,7 @@ func (s *SessionService) Create(
 
 	session := domain.NewSession(userID, tokenHash, refreshTokenHash, deviceInfo, ip, expiresAt)
 
-	if err := s.sessionRepo.Save(session); err != nil {
+	if err := s.commandRepo.Save(session); err != nil {
 		return nil, err
 	}
 
@@ -44,7 +47,7 @@ func (s *SessionService) Create(
 }
 
 func (s *SessionService) Delete(sessionID uuid.UUID) error {
-	session, err := s.sessionRepo.GetByID(sessionID)
+	session, err := s.queryRepo.GetByID(sessionID)
 	if err != nil {
 		return err
 	}
@@ -52,11 +55,57 @@ func (s *SessionService) Delete(sessionID uuid.UUID) error {
 		return ErrSessionNotFound
 	}
 
-	return s.sessionRepo.Delete(sessionID)
+	return s.commandRepo.Delete(sessionID)
 }
 
+func (s *SessionService) Revoke(sessionID uuid.UUID) error {
+	session, err := s.queryRepo.GetByID(sessionID)
+	if err != nil {
+		return err
+	}
+	if session == nil {
+		return ErrSessionNotFound
+	}
+
+	session.Revoke()
+	return s.commandRepo.Save(session)
+}
+
+func (s *SessionService) CleanupExpired() error {
+	sessions, err := s.queryRepo.GetAll()
+	if err != nil {
+		return err
+	}
+
+	for _, session := range sessions {
+		if session.IsExpired() {
+			session.Revoke()
+			if err := s.commandRepo.Save(session); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func (s *SessionService) Touch(sessionID uuid.UUID) error {
+	session, err := s.queryRepo.GetByID(sessionID)
+	if err != nil {
+		return err
+	}
+	if session == nil {
+		return ErrSessionNotFound
+	}
+
+	session.UpdateLastUsed()
+	return s.commandRepo.Save(session)
+}
+
+// --- Queries ---
+
 func (s *SessionService) GetByID(sessionID uuid.UUID) (*domain.Session, error) {
-	session, err := s.sessionRepo.GetByID(sessionID)
+	session, err := s.queryRepo.GetByID(sessionID)
 	if err != nil {
 		return nil, err
 	}
@@ -67,51 +116,5 @@ func (s *SessionService) GetByID(sessionID uuid.UUID) (*domain.Session, error) {
 }
 
 func (s *SessionService) GetByUserID(userID uuid.UUID) ([]*domain.Session, error) {
-	return s.sessionRepo.GetByUserID(userID)
-}
-
-func (s *SessionService) Revoke(sessionID uuid.UUID) error {
-	session, err := s.sessionRepo.GetByID(sessionID)
-	if err != nil {
-		return err
-	}
-	if session == nil {
-		return ErrSessionNotFound
-	}
-
-	session.Revoke()
-
-	return s.sessionRepo.Save(session)
-}
-
-func (s *SessionService) CleanupExpired() error {
-	sessions, err := s.sessionRepo.GetAll()
-	if err != nil {
-		return err
-	}
-
-	for _, session := range sessions {
-		if session.IsExpired() {
-			session.Revoke()
-			if err := s.sessionRepo.Save(session); err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
-}
-
-func (s *SessionService) Touch(sessionID uuid.UUID) error {
-	session, err := s.sessionRepo.GetByID(sessionID)
-	if err != nil {
-		return err
-	}
-	if session == nil {
-		return ErrSessionNotFound
-	}
-
-	session.UpdateLastUsed()
-
-	return s.sessionRepo.Save(session)
+	return s.queryRepo.GetByUserID(userID)
 }
