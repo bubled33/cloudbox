@@ -1,24 +1,25 @@
-package domain
+package user
 
 import (
 	"time"
 
-	uuid "github.com/google/uuid"
+	"github.com/google/uuid"
 )
 
 type User struct {
 	ID uuid.UUID
 
-	Email string
-
+	Email           Email
+	DisplayName     DisplayName
 	IsEmailVerified bool
 
-	DisplayName string
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
-func NewUser(email string, displayName string) *User {
+// --- Constructor ---
+
+func NewUser(email Email, displayName DisplayName) *User {
 	now := time.Now()
 	return &User{
 		ID:              uuid.New(),
@@ -30,7 +31,14 @@ func NewUser(email string, displayName string) *User {
 	}
 }
 
+// --- Behavior ---
+
 func (u *User) VerifyEmail() {
 	u.IsEmailVerified = true
+	u.UpdatedAt = time.Now()
+}
+
+func (u *User) Rename(displayName DisplayName) {
+	u.DisplayName = displayName
 	u.UpdatedAt = time.Now()
 }

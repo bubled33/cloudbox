@@ -2,83 +2,116 @@ package app
 
 import (
 	"github.com/google/uuid"
-	"github.com/yourusername/cloud-file-storage/internal/domain"
+	"github.com/yourusername/cloud-file-storage/internal/domain/user"
 )
 
 type UserService struct {
-	queryRepo   domain.UserQueryRepository
-	commandRepo domain.UserCommandRepository
+	queryRepo    user.QueryRepository
+	commandRepo  user.CommandRepository
+	eventService EventService
 }
 
 func NewUserService(
-	queryRepo domain.UserQueryRepository,
-	commandRepo domain.UserCommandRepository,
+	queryRepo user.QueryRepository,
+	commandRepo user.CommandRepository,
+	eventService EventService,
 ) *UserService {
 	return &UserService{
-		queryRepo:   queryRepo,
-		commandRepo: commandRepo,
+		queryRepo:    queryRepo,
+		commandRepo:  commandRepo,
+		eventService: eventService,
 	}
 }
 
 // --- Commands ---
 
-func (s *UserService) Create(email, displayName string) (*domain.User, error) {
-	user := domain.NewUser(email, displayName)
-	if err := s.commandRepo.Save(user); err != nil {
+func (s *UserService) Create(rawEmail, rawDisplayName string) (*user.User, error) {
+	email, err := user.NewEmail(rawEmail)
+	if err != nil {
 		return nil, err
 	}
-	return user, nil
+
+	displayName, err := user.NewDisplayName(rawDisplayName)
+	if err != nil {
+		return nil, err
+	}
+
+	u := user.NewUser(email, displayName)
+
+	if err := s.commandRepo.Save(u); err != nil {
+		return nil, err
+	}
+
+	eventType, payload := user.NewUserCreatedEvent(u)
+	_, _ = s.eventService.Create(eventType, payload)
+
+	return u, nil
 }
 
 func (s *UserService) Delete(id uuid.UUID) error {
-	user, err := s.queryRepo.GetByID(id)
+	u, err := s.queryRepo.GetByID(id)
 	if err != nil {
 		return err
 	}
-	if user == nil {
-		return ErrUserNotFound
+	if u == nil {
+		return user.ErrNotFound
 	}
 
-	return s.commandRepo.Delete(id)
+	if err := s.commandRepo.Delete(id); err != nil {
+		return err
+	}
+
+	eventType, payload := user.NewUserDeletedEvent(id)
+	_, _ = s.eventService.Create(eventType, payload)
+
+	return nil
 }
 
 func (s *UserService) VerifyEmail(userID uuid.UUID) error {
-	user, err := s.queryRepo.GetByID(userID)
+	u, err := s.queryRepo.GetByID(userID)
 	if err != nil {
 		return err
 	}
-	if user == nil {
-		return ErrUserNotFound
+	if u == nil {
+		return user.ErrNotFound
 	}
 
-	user.VerifyEmail()
-	return s.commandRepo.Save(user)
+	u.VerifyEmail()
+
+	if err := s.commandRepo.Save(u); err != nil {
+		return err
+	}
+
+	eventType, payload := user.NewUserEmailVerifiedEvent(userID)
+	_, _ = s.eventService.Create(eventType, payload)
+
+	return nil
 }
 
 // --- Queries ---
 
-func (s *UserService) GetByID(id uuid.UUID) (*domain.User, error) {
-	user, err := s.queryRepo.GetByID(id)
+func (s *UserService) GetByID(id uuid.UUID) (*user.User, error) {
+	u, err := s.queryRepo.GetByID(id)
 	if err != nil {
 		return nil, err
 	}
-	if user == nil {
-		return nil, ErrUserNotFound
+	if u == nil {
+		return nil, user.ErrNotFound
 	}
-	return user, nil
+	return u, nil
 }
 
-func (s *UserService) GetByEmail(email string) (*domain.User, error) {
-	user, err := s.queryRepo.GetByEmail(email)
+func (s *UserService) GetByEmail(email string) (*user.User, error) {
+	u, err := s.queryRepo.GetByEmail(email)
 	if err != nil {
 		return nil, err
 	}
-	if user == nil {
-		return nil, ErrUserNotFound
+	if u == nil {
+		return nil, user.ErrNotFound
 	}
-	return user, nil
+	return u, nil
 }
 
-func (s *UserService) GetAll() ([]*domain.User, error) {
+func (s *UserService) GetAll() ([]*user.User, error) {
 	return s.queryRepo.GetAll()
 }

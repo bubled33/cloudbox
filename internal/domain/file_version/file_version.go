@@ -1,7 +1,6 @@
-package domain
+package file_version
 
 import (
-	"fmt"
 	"time"
 
 	uuid "github.com/google/uuid"
@@ -12,26 +11,27 @@ type FileVersion struct {
 	FileId              uuid.UUID
 	UploadedBySessionId uuid.UUID
 
-	S3Key        string
-	Mime         string
-	PreviewS3Key *string
+	S3Key        S3Key
+	Mime         MimeType
+	PreviewS3Key *S3Key
 
 	Status FileStatus
 
-	Size       uint64
-	VersionNum int
+	Size       FileSize
+	VersionNum FileVersionNum
 
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
 
+// NewFileVersion создаёт новую версию файла с проверкой Value Objects
 func NewFileVersion(
 	fileID uuid.UUID,
 	uploadedBySessionID uuid.UUID,
-	s3Key string,
-	mime string,
-	size uint64,
-	versionNum int,
+	s3Key S3Key,
+	mime MimeType,
+	size FileSize,
+	versionNum FileVersionNum,
 ) *FileVersion {
 	now := time.Now()
 	return &FileVersion{
@@ -49,46 +49,43 @@ func NewFileVersion(
 	}
 }
 
+// SetStatus устанавливает новый статус файла
 func (fv *FileVersion) SetStatus(status FileStatus) error {
-	switch status {
-	case FileStatusUploaded, FileStatusProcessing, FileStatusReady, FileStatusFailed:
-		fv.Status = status
-		fv.UpdatedAt = time.Now()
-		return nil
-	default:
-		return fmt.Errorf("invalid file status: %s", status)
+	// проверка статуса через VO конструктор
+	_, err := NewFileStatus(string(status))
+	if err != nil {
+		return err
 	}
-}
-
-func (fv *FileVersion) SetPreviewS3Key(key string) {
-	fv.PreviewS3Key = &key
-	fv.UpdatedAt = time.Now()
-}
-
-func (fv *FileVersion) Rename(newName string) {
-	fv.Mime = newName
-	fv.UpdatedAt = time.Now()
-}
-func (fv *FileVersion) SetMime(mime string) {
-	fv.Mime = mime
-	fv.UpdatedAt = time.Now()
-}
-
-func (fv *FileVersion) SetSize(size uint64) error {
-	const MaxFileSize = 10 * 1024 * 1024 * 1024
-	if size > MaxFileSize {
-		return fmt.Errorf("file size exceeds 10GB limit")
-	}
-	fv.Size = size
+	fv.Status = status
 	fv.UpdatedAt = time.Now()
 	return nil
 }
 
-func (fv *FileVersion) SetVersionNum(versionNum int) {
+// SetPreviewS3Key задаёт ключ превью
+func (fv *FileVersion) SetPreviewS3Key(key S3Key) {
+	fv.PreviewS3Key = &key
+	fv.UpdatedAt = time.Now()
+}
+
+// SetMime задаёт MIME тип файла
+func (fv *FileVersion) SetMime(mime MimeType) {
+	fv.Mime = mime
+	fv.UpdatedAt = time.Now()
+}
+
+// SetSize задаёт размер файла
+func (fv *FileVersion) SetSize(size FileSize) {
+	fv.Size = size
+	fv.UpdatedAt = time.Now()
+}
+
+// SetVersionNum задаёт номер версии файла
+func (fv *FileVersion) SetVersionNum(versionNum FileVersionNum) {
 	fv.VersionNum = versionNum
 	fv.UpdatedAt = time.Now()
 }
 
+// Методы для быстрого обновления статуса через VO
 func (f *FileVersion) MarkUploaded() {
 	f.Status = FileStatusUploaded
 	f.UpdatedAt = time.Now()

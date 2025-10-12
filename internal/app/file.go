@@ -2,70 +2,91 @@ package app
 
 import (
 	"github.com/google/uuid"
-	"github.com/yourusername/cloud-file-storage/internal/domain"
+	"github.com/yourusername/cloud-file-storage/internal/domain/file"
+	"github.com/yourusername/cloud-file-storage/internal/domain/file_version"
 )
 
 type FileService struct {
-	fileQueryRepo      domain.FileQueryRepository
-	fileCommandRepo    domain.FileCommandRepository
-	versionQueryRepo   domain.FileVersionQueryRepository
-	versionCommandRepo domain.FileVersionCommandRepository
+	fileQueryRepo      file.QueryRepository
+	fileCommandRepo    file.CommandRepository
+	versionQueryRepo   file_version.QueryRepository
+	versionCommandRepo file_version.CommandRepository
+	eventService       *EventService
 }
 
 func NewFileService(
-	fileQueryRepo domain.FileQueryRepository,
-	fileCommandRepo domain.FileCommandRepository,
-	versionQueryRepo domain.FileVersionQueryRepository,
-	versionCommandRepo domain.FileVersionCommandRepository,
+	fileQueryRepo file.QueryRepository,
+	fileCommandRepo file.CommandRepository,
+	versionQueryRepo file_version.QueryRepository,
+	versionCommandRepo file_version.CommandRepository,
+	eventService *EventService,
 ) *FileService {
 	return &FileService{
 		fileQueryRepo:      fileQueryRepo,
 		fileCommandRepo:    fileCommandRepo,
 		versionQueryRepo:   versionQueryRepo,
 		versionCommandRepo: versionCommandRepo,
+		eventService:       eventService,
 	}
 }
 
 // --- Queries ---
 
-func (s *FileService) GetByID(fileID uuid.UUID) (*domain.File, error) {
-	file, err := s.fileQueryRepo.GetByID(fileID)
+func (s *FileService) GetByID(fileID uuid.UUID) (*file.File, error) {
+	f, err := s.fileQueryRepo.GetByID(fileID)
 	if err != nil {
 		return nil, err
 	}
-	if file == nil {
-		return nil, ErrFileNotFound
+	if f == nil {
+		return nil, file.ErrNotFound
 	}
-	return file, nil
+	return f, nil
 }
 
-func (s *FileService) GetAllByUser(userID uuid.UUID) ([]*domain.File, error) {
+func (s *FileService) GetAllByUser(userID uuid.UUID) ([]*file.File, error) {
 	return s.fileQueryRepo.GetByUserID(userID)
 }
 
-func (s *FileService) GetAll() ([]*domain.File, error) {
+func (s *FileService) GetAll() ([]*file.File, error) {
 	return s.fileQueryRepo.GetAll()
 }
 
 // --- Commands ---
 
-func (s *FileService) RenameFile(fileID uuid.UUID, name string) error {
-	file, err := s.fileQueryRepo.GetByID(fileID)
+func (s *FileService) RenameFile(fileID uuid.UUID, newName string) error {
+	f, err := s.fileQueryRepo.GetByID(fileID)
 	if err != nil {
 		return err
 	}
-	if file == nil {
-		return ErrFileNotFound
+	if f == nil {
+		return file.ErrNotFound
 	}
 
-	file.Rename(name)
-	return s.fileCommandRepo.Save(file)
+	// создаём VO для имени файла
+	nameVO, err := file.NewFileName(newName)
+	if err != nil {
+		return err
+	}
+
+	f.Rename(nameVO)
+
+	if err := s.fileCommandRepo.Save(f); err != nil {
+		return err
+	}
+
+	// событие переименования
+	if s.eventService != nil {
+		eventName, payload := file.NewFileRenamedEvent(f)
+		_, _ = s.eventService.Create(eventName, payload)
+	}
+
+	return nil
 }
 
 func (s *FileService) Delete(fileID uuid.UUID) error {
-	file, err := s.fileQueryRepo.GetByID(fileID)
-	if err != nil || file == nil {
-		return ErrFileNotFound
+	f, err := s.fileQueryRepo.GetByID(fileID)
+	if err != nil || f == nil {
+		return file.ErrNotFound
 	}
 
 	versions, err := s.versionQueryRepo.GetByFileID(fileID)
@@ -73,20 +94,26 @@ func (s *FileService) Delete(fileID uuid.UUID) error {
 		return err
 	}
 
-	// Проверка статусов версий
 	for _, v := range versions {
-		if v.Status == domain.FileStatusProcessing {
-			return ErrVersionProcessing
+		if v.Status.Equal(file_version.FileStatusProcessing) {
+			return file_version.ErrVersionProcessing
 		}
 	}
 
-	// Удаляем версии
 	for _, v := range versions {
 		if err := s.versionCommandRepo.Delete(v.ID); err != nil {
 			return err
 		}
 	}
 
-	// Удаляем сам файл
-	return s.fileCommandRepo.Delete(fileID)
+	if err := s.fileCommandRepo.Delete(fileID); err != nil {
+		return err
+	}
+
+	if s.eventService != nil {
+		eventName, payload := file.NewFileDeletedEvent(f)
+		_, _ = s.eventService.Create(eventName, payload)
+	}
+
+	return nil
 }

@@ -5,21 +5,25 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/yourusername/cloud-file-storage/internal/domain"
+	"github.com/yourusername/cloud-file-storage/internal/domain/session"
+	"github.com/yourusername/cloud-file-storage/internal/domain/value_objects"
 )
 
 type SessionService struct {
-	queryRepo   domain.SessionQueryRepository
-	commandRepo domain.SessionCommandRepository
+	queryRepo    session.QueryRepository
+	commandRepo  session.CommandRepository
+	eventService *EventService
 }
 
 func NewSessionService(
-	queryRepo domain.SessionQueryRepository,
-	commandRepo domain.SessionCommandRepository,
+	queryRepo session.QueryRepository,
+	commandRepo session.CommandRepository,
+	eventService *EventService,
 ) *SessionService {
 	return &SessionService{
-		queryRepo:   queryRepo,
-		commandRepo: commandRepo,
+		queryRepo:    queryRepo,
+		commandRepo:  commandRepo,
+		eventService: eventService,
 	}
 }
 
@@ -27,48 +31,95 @@ func NewSessionService(
 
 func (s *SessionService) Create(
 	userID uuid.UUID,
-	tokenHash string,
-	refreshTokenHash string,
-	deviceInfo string,
+	tokenHashRaw string,
+	refreshTokenHashRaw string,
+	deviceInfoRaw string,
 	ip net.IP,
 	expiresAt time.Time,
-) (*domain.Session, error) {
-	if time.Until(expiresAt) <= 0 {
-		return nil, ErrInvalidExpiry
-	}
-
-	session := domain.NewSession(userID, tokenHash, refreshTokenHash, deviceInfo, ip, expiresAt)
-
-	if err := s.commandRepo.Save(session); err != nil {
+) (*session.Session, error) {
+	// создаём Value Objects
+	tokenHash, err := value_objects.NewTokenHash(tokenHashRaw)
+	if err != nil {
 		return nil, err
 	}
 
-	return session, nil
+	refreshTokenHash, err := value_objects.NewTokenHash(refreshTokenHashRaw)
+	if err != nil {
+		return nil, err
+	}
+
+	deviceInfo, err := value_objects.NewDeviceInfo(deviceInfoRaw)
+	if err != nil {
+		return nil, err
+	}
+
+	ipVO, err := value_objects.NewIP(ip)
+	if err != nil {
+		return nil, err
+	}
+
+	expiresAtVO, err := value_objects.NewExpiresAt(expiresAt)
+	if err != nil {
+		return nil, err
+	}
+
+	// создаём сессию
+	sess := session.NewSession(userID, tokenHash, refreshTokenHash, deviceInfo, ipVO, expiresAtVO)
+
+	if err := s.commandRepo.Save(sess); err != nil {
+		return nil, err
+	}
+
+	// Событие создания сессии
+	if s.eventService != nil {
+		eventName, payload := session.NewSessionCreatedEvent(sess)
+		_, _ = s.eventService.Create(eventName, payload)
+	}
+
+	return sess, nil
 }
 
 func (s *SessionService) Delete(sessionID uuid.UUID) error {
-	session, err := s.queryRepo.GetByID(sessionID)
+	sess, err := s.queryRepo.GetByID(sessionID)
 	if err != nil {
 		return err
 	}
-	if session == nil {
-		return ErrSessionNotFound
+	if sess == nil {
+		return session.ErrNotFound
 	}
 
-	return s.commandRepo.Delete(sessionID)
+	if err := s.commandRepo.Delete(sessionID); err != nil {
+		return err
+	}
+
+	if s.eventService != nil {
+		eventName, payload := session.NewSessionDeletedEvent(sessionID)
+		_, _ = s.eventService.Create(eventName, payload)
+	}
+
+	return nil
 }
 
 func (s *SessionService) Revoke(sessionID uuid.UUID) error {
-	session, err := s.queryRepo.GetByID(sessionID)
+	sess, err := s.queryRepo.GetByID(sessionID)
 	if err != nil {
 		return err
 	}
-	if session == nil {
-		return ErrSessionNotFound
+	if sess == nil {
+		return session.ErrNotFound
 	}
 
-	session.Revoke()
-	return s.commandRepo.Save(session)
+	sess.Revoke()
+	if err := s.commandRepo.Save(sess); err != nil {
+		return err
+	}
+
+	if s.eventService != nil {
+		eventName, payload := session.NewSessionRevokedEvent(sessionID)
+		_, _ = s.eventService.Create(eventName, payload)
+	}
+
+	return nil
 }
 
 func (s *SessionService) CleanupExpired() error {
@@ -77,11 +128,16 @@ func (s *SessionService) CleanupExpired() error {
 		return err
 	}
 
-	for _, session := range sessions {
-		if session.IsExpired() {
-			session.Revoke()
-			if err := s.commandRepo.Save(session); err != nil {
+	for _, sess := range sessions {
+		if sess.IsExpired() {
+			sess.Revoke()
+			if err := s.commandRepo.Save(sess); err != nil {
 				return err
+			}
+
+			if s.eventService != nil {
+				eventName, payload := session.NewSessionExpiredEvent(sess.ID)
+				_, _ = s.eventService.Create(eventName, payload)
 			}
 		}
 	}
@@ -90,31 +146,31 @@ func (s *SessionService) CleanupExpired() error {
 }
 
 func (s *SessionService) Touch(sessionID uuid.UUID) error {
-	session, err := s.queryRepo.GetByID(sessionID)
+	sess, err := s.queryRepo.GetByID(sessionID)
 	if err != nil {
 		return err
 	}
-	if session == nil {
-		return ErrSessionNotFound
+	if sess == nil {
+		return session.ErrNotFound
 	}
 
-	session.UpdateLastUsed()
-	return s.commandRepo.Save(session)
+	sess.UpdateLastUsed()
+	return s.commandRepo.Save(sess)
 }
 
 // --- Queries ---
 
-func (s *SessionService) GetByID(sessionID uuid.UUID) (*domain.Session, error) {
-	session, err := s.queryRepo.GetByID(sessionID)
+func (s *SessionService) GetByID(sessionID uuid.UUID) (*session.Session, error) {
+	sess, err := s.queryRepo.GetByID(sessionID)
 	if err != nil {
 		return nil, err
 	}
-	if session == nil {
-		return nil, ErrSessionNotFound
+	if sess == nil {
+		return nil, session.ErrNotFound
 	}
-	return session, nil
+	return sess, nil
 }
 
-func (s *SessionService) GetByUserID(userID uuid.UUID) ([]*domain.Session, error) {
+func (s *SessionService) GetByUserID(userID uuid.UUID) ([]*session.Session, error) {
 	return s.queryRepo.GetByUserID(userID)
 }

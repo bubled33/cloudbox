@@ -4,28 +4,33 @@ import (
 	"fmt"
 	"time"
 
+	"fyne.io/fyne/v2/storage"
 	"github.com/google/uuid"
-	"github.com/yourusername/cloud-file-storage/internal/domain"
+	"github.com/yourusername/cloud-file-storage/internal/domain/file"
+	"github.com/yourusername/cloud-file-storage/internal/domain/file_version"
+	"github.com/yourusername/cloud-file-storage/internal/domain/queue"
 )
 
 const uploadURLTTL = 15 * time.Minute
 
 type FileVersionService struct {
-	fileQueryRepo      domain.FileQueryRepository
-	fileCommandRepo    domain.FileCommandRepository
-	versionQueryRepo   domain.FileVersionQueryRepository
-	versionCommandRepo domain.FileVersionCommandRepository
-	storage            domain.Storage
-	previewQueue       domain.PreviewQueue
+	fileQueryRepo      file.QueryRepository
+	fileCommandRepo    file.CommandRepository
+	versionQueryRepo   file_version.QueryRepository
+	versionCommandRepo file_version.CommandRepository
+	storage            storage.Storage
+	previewQueue       queue.PreviewQueue
+	eventService       *EventService
 }
 
 func NewFileVersionService(
-	fileQueryRepo domain.FileQueryRepository,
-	fileCommandRepo domain.FileCommandRepository,
-	versionQueryRepo domain.FileVersionQueryRepository,
-	versionCommandRepo domain.FileVersionCommandRepository,
-	storage domain.Storage,
-	previewQueue domain.PreviewQueue,
+	fileQueryRepo file.QueryRepository,
+	fileCommandRepo file.CommandRepository,
+	versionQueryRepo file_version.QueryRepository,
+	versionCommandRepo file_version.CommandRepository,
+	storage storage.Storage,
+	previewQueue queue.PreviewQueue,
+	eventService *EventService,
 ) *FileVersionService {
 	return &FileVersionService{
 		fileQueryRepo:      fileQueryRepo,
@@ -34,6 +39,7 @@ func NewFileVersionService(
 		versionCommandRepo: versionCommandRepo,
 		storage:            storage,
 		previewQueue:       previewQueue,
+		eventService:       eventService,
 	}
 }
 
@@ -43,37 +49,57 @@ func generateS3Key(ownerID, fileID uuid.UUID, versionNum int, name string) strin
 
 // --- Queries ---
 
-func (s *FileVersionService) GetFileByID(fileID uuid.UUID) (*domain.File, error) {
+func (s *FileVersionService) GetFileByID(fileID uuid.UUID) (*file.File, error) {
 	return s.fileQueryRepo.GetByID(fileID)
 }
 
-func (s *FileVersionService) GetVersionsByFileID(fileID uuid.UUID) ([]*domain.FileVersion, error) {
+func (s *FileVersionService) GetVersionsByFileID(fileID uuid.UUID) ([]*file_version.FileVersion, error) {
 	return s.versionQueryRepo.GetByFileID(fileID)
 }
 
-func (s *FileVersionService) GetVersionByID(versionID uuid.UUID) (*domain.FileVersion, error) {
+func (s *FileVersionService) GetVersionByID(versionID uuid.UUID) (*file_version.FileVersion, error) {
 	version, err := s.versionQueryRepo.GetByID(versionID)
 	if err != nil {
 		return nil, err
 	}
 	if version == nil {
-		return nil, ErrVersionNotFound
+		return nil, file_version.ErrVersionNotFound
 	}
 	return version, nil
 }
 
-func (s *FileVersionService) GetAllVersions() ([]*domain.FileVersion, error) {
+func (s *FileVersionService) GetAllVersions() ([]*file_version.FileVersion, error) {
 	return s.versionQueryRepo.GetAll()
 }
 
 // --- Commands ---
 
-func (s *FileVersionService) UploadNewFile(ownerID, sessionID uuid.UUID, name string, size uint64, mime string) (*domain.File, *domain.FileVersion, string, error) {
-	file := domain.NewFile(ownerID, name, size, mime, 1, sessionID)
-	s3Key := generateS3Key(ownerID, file.ID, 1, name)
-	version := domain.NewFileVersion(file.ID, sessionID, s3Key, mime, size, 1)
+func (s *FileVersionService) UploadNewFile(ownerID, sessionID uuid.UUID, name string, size uint64, mime string) (*file.File, *file_version.FileVersion, string, error) {
+	fileNameVO, err := file.NewFileName(name)
+	if err != nil {
+		return nil, nil, "", err
+	}
+	fileSizeVO, err := file_version.NewFileSize(size)
+	if err != nil {
+		return nil, nil, "", err
+	}
+	mimeVO, err := file_version.NewMimeType(mime)
+	if err != nil {
+		return nil, nil, "", err
+	}
+	versionNumVO, _ := file_version.NewFileVersionNum(1)
 
-	if err := s.fileCommandRepo.Save(file); err != nil {
+	f := file.NewFile(ownerID, fileNameVO, fileSizeVO, mimeVO, versionNumVO, sessionID)
+
+	key := generateS3Key(ownerID, f.ID, versionNumVO.Int(), fileNameVO.String())
+	s3, err := file_version.NewS3Key(key)
+	if err != nil {
+		return nil, nil, "", err
+	}
+
+	version := file_version.NewFileVersion(f.ID, sessionID, s3, mimeVO, fileSizeVO, versionNumVO)
+
+	if err := s.fileCommandRepo.Save(f); err != nil {
 		return nil, nil, "", err
 	}
 	if err := s.versionCommandRepo.Save(version); err != nil {
@@ -85,23 +111,34 @@ func (s *FileVersionService) UploadNewFile(ownerID, sessionID uuid.UUID, name st
 		return nil, nil, "", err
 	}
 
-	return file, version, uploadURL, nil
+	if s.eventService != nil {
+		eventName, payload := file.NewFileUploadedEvent(f, version)
+		_, _ = s.eventService.Create(eventName, payload)
+	}
+
+	return f, version, uploadURL, nil
 }
 
-func (s *FileVersionService) UploadNewVersion(fileID, ownerID, sessionID uuid.UUID, name string, size uint64, mime string, versionNum int) (*domain.File, *domain.FileVersion, string, error) {
-	file, err := s.fileQueryRepo.GetByID(fileID)
+func (s *FileVersionService) UploadNewVersion(fileID, ownerID, sessionID uuid.UUID, name string, size uint64, mime string, versionNum int) (*file.File, *file_version.FileVersion, string, error) {
+	f, err := s.fileQueryRepo.GetByID(fileID)
 	if err != nil {
 		return nil, nil, "", err
 	}
-	if file == nil {
-		return nil, nil, "", ErrFileNotFound
+	if f == nil {
+		return nil, nil, "", file.ErrNotFound
 	}
 
-	s3Key := generateS3Key(ownerID, file.ID, versionNum, name)
-	version := domain.NewFileVersion(file.ID, sessionID, s3Key, mime, size, versionNum)
-	file.UpdateFromVersion(version)
+	fileNameVO, _ := file.NewFileName(name)
+	fileSizeVO, _ := file_version.NewFileSize(size)
+	mimeVO, _ := file_version.NewMimeType(mime)
+	versionNumVO, _ := file_version.NewFileVersionNum(versionNum)
 
-	if err := s.fileCommandRepo.Save(file); err != nil {
+	s3Key := generateS3Key(ownerID, f.ID, versionNumVO.Int(), fileNameVO.String())
+	version := file_version.NewFileVersion(f.ID, sessionID, file_version.NewS3Key{s3Key}, mimeVO, fileSizeVO, versionNumVO)
+
+	f.UpdateFromVersion(version)
+
+	if err := s.fileCommandRepo.Save(f); err != nil {
 		return nil, nil, "", err
 	}
 	if err := s.versionCommandRepo.Save(version); err != nil {
@@ -113,16 +150,21 @@ func (s *FileVersionService) UploadNewVersion(fileID, ownerID, sessionID uuid.UU
 		return nil, nil, "", err
 	}
 
-	return file, version, uploadURL, nil
+	if s.eventService != nil {
+		eventName, payload := file.NewFileVersionUploadedEvent(f, version)
+		_, _ = s.eventService.Create(eventName, payload)
+	}
+
+	return f, version, uploadURL, nil
 }
 
 func (s *FileVersionService) RestoreVersion(fileID, versionID uuid.UUID) error {
-	file, err := s.fileQueryRepo.GetByID(fileID)
+	f, err := s.fileQueryRepo.GetByID(fileID)
 	if err != nil {
 		return err
 	}
-	if file == nil {
-		return ErrFileNotFound
+	if f == nil {
+		return file.ErrNotFound
 	}
 
 	version, err := s.versionQueryRepo.GetByID(versionID)
@@ -130,38 +172,54 @@ func (s *FileVersionService) RestoreVersion(fileID, versionID uuid.UUID) error {
 		return err
 	}
 	if version == nil {
-		return ErrVersionNotFound
+		return file_version.ErrVersionNotFound
 	}
 
-	file.UpdateFromVersion(version)
-	return s.fileCommandRepo.Save(file)
+	f.UpdateFromVersion(version)
+	if err := s.fileCommandRepo.Save(f); err != nil {
+		return err
+	}
+
+	if s.eventService != nil {
+		eventName, payload := file.NewFileVersionRestoredEvent(f, version)
+		_, _ = s.eventService.Create(eventName, payload)
+	}
+
+	return nil
 }
 
 func (s *FileVersionService) DeleteVersion(fileID, versionID uuid.UUID) error {
-	file, err := s.fileQueryRepo.GetByID(fileID)
-	if err != nil || file == nil {
-		return ErrFileNotFound
+	f, err := s.fileQueryRepo.GetByID(fileID)
+	if err != nil || f == nil {
+		return file.ErrNotFound
 	}
 
 	version, err := s.versionQueryRepo.GetByID(versionID)
 	if err != nil || version == nil {
-		return ErrVersionNotFound
+		return file_version.ErrVersionNotFound
 	}
 
-	if version.VersionNum == file.VersionNum {
-		return ErrCannotDeleteCurr
+	if version.VersionNum.Equal(f.VersionNum) {
+		return file_version.ErrCannotDeleteCurrentVersion
+	}
+	if version.Status.Equal(file_version.FileStatusProcessing) {
+		return file_version.ErrVersionProcessing
 	}
 
-	if version.Status == domain.FileStatusProcessing {
-		return ErrVersionProcessing
-	}
-
-	// Удаляем из хранилища
 	if version.PreviewS3Key != nil {
 		_ = s.previewQueue.Remove(version.ID)
-		_ = s.storage.Delete(*version.PreviewS3Key)
+		_ = s.storage.Delete(version.PreviewS3Key.String())
 	}
-	_ = s.storage.Delete(version.S3Key)
+	_ = s.storage.Delete(version.S3Key.String())
 
-	return s.versionCommandRepo.Delete(versionID)
+	if err := s.versionCommandRepo.Delete(versionID); err != nil {
+		return err
+	}
+
+	if s.eventService != nil {
+		eventName, payload := file.NewFileVersionDeletedEvent(f, version)
+		_, _ = s.eventService.Create(eventName, payload)
+	}
+
+	return nil
 }

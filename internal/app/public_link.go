@@ -5,26 +5,31 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/yourusername/cloud-file-storage/internal/domain"
+	"github.com/yourusername/cloud-file-storage/internal/domain/public_link"
+	"github.com/yourusername/cloud-file-storage/internal/domain/queue"
+	"github.com/yourusername/cloud-file-storage/internal/domain/value_objects"
 )
 
 const defaultPublicLinkTTL = 15 * time.Minute
 
 type PublicLinkService struct {
-	queryRepo   domain.PublicLinkQueryRepository
-	commandRepo domain.PublicLinkCommandRepository
-	queue       domain.Expirer
+	queryRepo    public_link.PublicLinkQueryRepository
+	commandRepo  public_link.PublicLinkCommandRepository
+	queue        queue.Expirer
+	eventService *EventService
 }
 
 func NewPublicLinkService(
-	queryRepo domain.PublicLinkQueryRepository,
-	commandRepo domain.PublicLinkCommandRepository,
-	queue domain.Expirer,
+	queryRepo public_link.PublicLinkQueryRepository,
+	commandRepo public_link.PublicLinkCommandRepository,
+	queue queue.Expirer,
+	eventService *EventService,
 ) *PublicLinkService {
 	return &PublicLinkService{
-		queryRepo:   queryRepo,
-		commandRepo: commandRepo,
-		queue:       queue,
+		queryRepo:    queryRepo,
+		commandRepo:  commandRepo,
+		queue:        queue,
+		eventService: eventService,
 	}
 }
 
@@ -32,25 +37,45 @@ func NewPublicLinkService(
 
 func (s *PublicLinkService) Create(
 	fileID, createdByUserID uuid.UUID,
-	tokenHash string,
-	expiresAt time.Time,
-) (*domain.PublicLink, error) {
+	tokenHashRaw string,
+	expiresAtRaw time.Time,
+) (*public_link.PublicLink, error) {
 	now := time.Now()
+
+	// создаём VO для токена
+	tokenHash, err := value_objects.NewTokenHash(tokenHashRaw)
+	if err != nil {
+		return nil, err
+	}
+
+	// создаём VO для времени истечения
+	expiresAt := expiresAtRaw
 	if expiresAt.IsZero() {
 		expiresAt = now.Add(defaultPublicLinkTTL)
 	}
-	if !expiresAt.After(now) {
-		return nil, ErrInvalidExpiryTime
+	expiresAtVO, err := value_objects.NewExpiresAt(expiresAt)
+	if err != nil {
+		return nil, err
 	}
 
-	link := domain.NewPublicLink(fileID, createdByUserID, tokenHash, expiresAt)
+	// создаём сущность
+	link := public_link.NewPublicLink(fileID, createdByUserID, tokenHash.String(), expiresAtVO.Time())
+
+	// сохраняем
 	if err := s.commandRepo.Save(link); err != nil {
 		return nil, err
 	}
 
-	ttl := time.Until(expiresAt)
+	// добавляем в очередь истечения срока
+	ttl := time.Until(expiresAtVO.Time())
 	if err := s.queue.Enqueue(link.ID, ttl); err != nil {
 		return nil, err
+	}
+
+	// событие создания
+	if s.eventService != nil {
+		eventName, payload := public_link.NewPublicLinkCreatedEvent(link)
+		_, _ = s.eventService.Create(eventName, payload)
 	}
 
 	return link, nil
@@ -62,7 +87,7 @@ func (s *PublicLinkService) Delete(id uuid.UUID) error {
 		return err
 	}
 	if link == nil {
-		return ErrPublicLinkNotFound
+		return public_link.ErrNotFound
 	}
 
 	if err := s.commandRepo.Delete(id); err != nil {
@@ -70,6 +95,12 @@ func (s *PublicLinkService) Delete(id uuid.UUID) error {
 	}
 
 	_ = s.queue.Remove(id)
+
+	if s.eventService != nil {
+		eventName, payload := public_link.NewPublicLinkDeletedEvent(id)
+		_, _ = s.eventService.Create(eventName, payload)
+	}
+
 	return nil
 }
 
@@ -79,25 +110,34 @@ func (s *PublicLinkService) Expire(id uuid.UUID) error {
 		return err
 	}
 	if link == nil {
-		return ErrPublicLinkNotFound
+		return public_link.ErrNotFound
 	}
 	if link.IsExpired {
 		return nil
 	}
 
 	link.MarkAsExpired()
-	return s.commandRepo.Save(link)
+	if err := s.commandRepo.Save(link); err != nil {
+		return err
+	}
+
+	if s.eventService != nil {
+		eventName, payload := public_link.NewPublicLinkExpiredEvent(id)
+		_, _ = s.eventService.Create(eventName, payload)
+	}
+
+	return nil
 }
 
 // --- Queries ---
 
-func (s *PublicLinkService) GetByID(id uuid.UUID) (*domain.PublicLink, error) {
+func (s *PublicLinkService) GetByID(id uuid.UUID) (*public_link.PublicLink, error) {
 	link, err := s.queryRepo.GetByID(id)
 	if err != nil {
 		return nil, err
 	}
 	if link == nil {
-		return nil, ErrPublicLinkNotFound
+		return nil, public_link.ErrNotFound
 	}
 	if link.IsExpired {
 		return nil, errors.New("link has expired")
@@ -105,6 +145,6 @@ func (s *PublicLinkService) GetByID(id uuid.UUID) (*domain.PublicLink, error) {
 	return link, nil
 }
 
-func (s *PublicLinkService) GetAll() ([]*domain.PublicLink, error) {
+func (s *PublicLinkService) GetAll() ([]*public_link.PublicLink, error) {
 	return s.queryRepo.GetAll()
 }

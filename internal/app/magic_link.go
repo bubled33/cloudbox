@@ -5,26 +5,31 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/yourusername/cloud-file-storage/internal/domain"
+	"github.com/yourusername/cloud-file-storage/internal/domain/magic_link"
+	"github.com/yourusername/cloud-file-storage/internal/domain/queue"
+	"github.com/yourusername/cloud-file-storage/internal/domain/value_objects"
 )
 
 const magicLinkTTL = 5 * time.Minute
 
 type MagicLinkService struct {
-	queryRepo   domain.MagicLinkQueryRepository
-	commandRepo domain.MagicLinkCommandRepository
-	queue       domain.Expirer
+	queryRepo    magic_link.QueryRepository
+	commandRepo  magic_link.CommandRepository
+	queue        queue.Expirer
+	eventService *EventService
 }
 
 func NewMagicLinkService(
-	queryRepo domain.MagicLinkQueryRepository,
-	commandRepo domain.MagicLinkCommandRepository,
-	queue domain.Expirer,
+	queryRepo magic_link.QueryRepository,
+	commandRepo magic_link.CommandRepository,
+	queue queue.Expirer,
+	eventService *EventService,
 ) *MagicLinkService {
 	return &MagicLinkService{
-		queryRepo:   queryRepo,
-		commandRepo: commandRepo,
-		queue:       queue,
+		queryRepo:    queryRepo,
+		commandRepo:  commandRepo,
+		queue:        queue,
+		eventService: eventService,
 	}
 }
 
@@ -32,13 +37,39 @@ func NewMagicLinkService(
 
 func (s *MagicLinkService) Create(
 	userID uuid.UUID,
-	tokenHash string,
-	deviceInfo string,
-	purpose string,
+	tokenHashRaw string,
+	deviceInfoRaw string,
+	purposeRaw string,
 	ip net.IP,
-) (*domain.MagicLink, error) {
-	expiresAt := time.Now().Add(magicLinkTTL)
-	link := domain.NewMagicLink(userID, tokenHash, deviceInfo, purpose, ip, expiresAt)
+) (*magic_link.MagicLink, error) {
+	// создаём VO с валидацией
+	tokenHash, err := value_objects.NewTokenHash(tokenHashRaw)
+	if err != nil {
+		return nil, err
+	}
+
+	deviceInfo, err := value_objects.NewDeviceInfo(deviceInfoRaw)
+	if err != nil {
+		return nil, err
+	}
+
+	purpose, err := magic_link.NewPurpose(purposeRaw)
+	if err != nil {
+		return nil, err
+	}
+
+	ipVO, err := value_objects.NewIP(ip)
+	if err != nil {
+		return nil, err
+	}
+
+	expiresAtVO, err := value_objects.NewExpiresAt(time.Now().Add(magicLinkTTL))
+	if err != nil {
+		return nil, err
+	}
+
+	// создаём магическую ссылку
+	link := magic_link.NewMagicLink(userID, tokenHash, deviceInfo, purpose, ipVO, expiresAtVO)
 
 	if err := s.commandRepo.Save(link); err != nil {
 		return nil, err
@@ -46,6 +77,12 @@ func (s *MagicLinkService) Create(
 
 	if err := s.queue.Enqueue(link.ID, magicLinkTTL); err != nil {
 		return nil, err
+	}
+
+	// Событие создания магической ссылки
+	if s.eventService != nil {
+		eventName, payload := magic_link.NewMagicLinkCreatedEvent(link)
+		_, _ = s.eventService.Create(eventName, payload)
 	}
 
 	return link, nil
@@ -57,11 +94,21 @@ func (s *MagicLinkService) MarkAsUsed(id uuid.UUID) error {
 		return err
 	}
 	if link == nil {
-		return ErrMagicLinkNotFound
+		return magic_link.ErrNotFound
 	}
 
 	link.MarkAsUsed()
-	return s.commandRepo.Save(link)
+
+	if err := s.commandRepo.Save(link); err != nil {
+		return err
+	}
+
+	if s.eventService != nil {
+		eventName, payload := magic_link.NewMagicLinkUsedEvent(link)
+		_, _ = s.eventService.Create(eventName, payload)
+	}
+
+	return nil
 }
 
 func (s *MagicLinkService) Expire(id uuid.UUID) error {
@@ -70,11 +117,23 @@ func (s *MagicLinkService) Expire(id uuid.UUID) error {
 		return err
 	}
 	if link == nil {
-		return ErrMagicLinkNotFound
+		return magic_link.ErrNotFound
 	}
 
-	link.MarkAsExpired()
-	return s.commandRepo.Save(link)
+	if err := link.MarkAsExpired(); err != nil {
+		return err
+	}
+
+	if err := s.commandRepo.Save(link); err != nil {
+		return err
+	}
+
+	if s.eventService != nil {
+		eventName, payload := magic_link.NewMagicLinkExpiredEvent(link)
+		_, _ = s.eventService.Create(eventName, payload)
+	}
+
+	return nil
 }
 
 func (s *MagicLinkService) Delete(id uuid.UUID) error {
@@ -83,7 +142,7 @@ func (s *MagicLinkService) Delete(id uuid.UUID) error {
 		return err
 	}
 	if link == nil {
-		return ErrMagicLinkNotFound
+		return magic_link.ErrNotFound
 	}
 
 	if err := s.commandRepo.Delete(id); err != nil {
@@ -91,38 +150,49 @@ func (s *MagicLinkService) Delete(id uuid.UUID) error {
 	}
 
 	_ = s.queue.Remove(id)
+
+	if s.eventService != nil {
+		eventName, payload := magic_link.NewMagicLinkDeletedEvent(link)
+		_, _ = s.eventService.Create(eventName, payload)
+	}
+
 	return nil
 }
 
 // --- Queries ---
 
-func (s *MagicLinkService) GetByID(id uuid.UUID) (*domain.MagicLink, error) {
+func (s *MagicLinkService) GetByID(id uuid.UUID) (*magic_link.MagicLink, error) {
 	link, err := s.queryRepo.GetByID(id)
 	if err != nil {
 		return nil, err
 	}
 	if link == nil {
-		return nil, ErrMagicLinkNotFound
+		return nil, magic_link.ErrNotFound
 	}
 	return link, nil
 }
 
-func (s *MagicLinkService) GetByUserID(userID uuid.UUID) ([]*domain.MagicLink, error) {
+func (s *MagicLinkService) GetByUserID(userID uuid.UUID) ([]*magic_link.MagicLink, error) {
 	return s.queryRepo.GetByUserID(userID)
 }
 
-func (s *MagicLinkService) GetByTokenHash(tokenHash string) (*domain.MagicLink, error) {
+func (s *MagicLinkService) GetByTokenHash(tokenHashRaw string) (*magic_link.MagicLink, error) {
+	tokenHash, err := value_objects.NewTokenHash(tokenHashRaw)
+	if err != nil {
+		return nil, err
+	}
+
 	link, err := s.queryRepo.GetByTokenHash(tokenHash)
 	if err != nil {
 		return nil, err
 	}
 	if link == nil {
-		return nil, ErrMagicLinkNotFound
+		return nil, magic_link.ErrNotFound
 	}
 	return link, nil
 }
 
-func (s *MagicLinkService) GetAll() ([]*domain.MagicLink, error) {
+func (s *MagicLinkService) GetAll() ([]*magic_link.MagicLink, error) {
 	return s.queryRepo.GetAll()
 }
 
