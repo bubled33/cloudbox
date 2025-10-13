@@ -33,8 +33,6 @@ func NewMagicLinkService(
 	}
 }
 
-// --- Commands ---
-
 func (s *MagicLinkService) Create(
 	userID uuid.UUID,
 	tokenHashRaw string,
@@ -42,7 +40,6 @@ func (s *MagicLinkService) Create(
 	purposeRaw string,
 	ip net.IP,
 ) (*magic_link.MagicLink, error) {
-	// создаём VO с валидацией
 	tokenHash, err := value_objects.NewTokenHash(tokenHashRaw)
 	if err != nil {
 		return nil, err
@@ -68,7 +65,6 @@ func (s *MagicLinkService) Create(
 		return nil, err
 	}
 
-	// создаём магическую ссылку
 	link := magic_link.NewMagicLink(userID, tokenHash, deviceInfo, purpose, ipVO, expiresAtVO)
 
 	if err := s.commandRepo.Save(link); err != nil {
@@ -79,7 +75,6 @@ func (s *MagicLinkService) Create(
 		return nil, err
 	}
 
-	// Событие создания магической ссылки
 	if s.eventService != nil {
 		eventName, payload := magic_link.NewMagicLinkCreatedEvent(link)
 		_, _ = s.eventService.Create(eventName, payload)
@@ -158,8 +153,6 @@ func (s *MagicLinkService) Delete(id uuid.UUID) error {
 
 	return nil
 }
-
-// --- Queries ---
 
 func (s *MagicLinkService) GetByID(id uuid.UUID) (*magic_link.MagicLink, error) {
 	link, err := s.queryRepo.GetByID(id)

@@ -9,7 +9,6 @@ const (
 	PurposeResetPassword Purpose = "reset_password"
 )
 
-// NewPurpose создаёт новый Purpose с валидацией
 func NewPurpose(raw string) (Purpose, error) {
 	switch raw {
 	case string(PurposeLogin), string(PurposeResetPassword):
@@ -19,7 +18,6 @@ func NewPurpose(raw string) (Purpose, error) {
 	}
 }
 
-// String возвращает строковое значение Purpose
 func (p Purpose) String() string {
 	return string(p)
 }

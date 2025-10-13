@@ -33,8 +33,6 @@ func NewPublicLinkService(
 	}
 }
 
-// --- Commands ---
-
 func (s *PublicLinkService) Create(
 	fileID, createdByUserID uuid.UUID,
 	tokenHashRaw string,
@@ -42,13 +40,11 @@ func (s *PublicLinkService) Create(
 ) (*public_link.PublicLink, error) {
 	now := time.Now()
 
-	// создаём VO для токена
 	tokenHash, err := value_objects.NewTokenHash(tokenHashRaw)
 	if err != nil {
 		return nil, err
 	}
 
-	// создаём VO для времени истечения
 	expiresAt := expiresAtRaw
 	if expiresAt.IsZero() {
 		expiresAt = now.Add(defaultPublicLinkTTL)
@@ -58,21 +54,17 @@ func (s *PublicLinkService) Create(
 		return nil, err
 	}
 
-	// создаём сущность
 	link := public_link.NewPublicLink(fileID, createdByUserID, tokenHash.String(), expiresAtVO.Time())
 
-	// сохраняем
 	if err := s.commandRepo.Save(link); err != nil {
 		return nil, err
 	}
 
-	// добавляем в очередь истечения срока
 	ttl := time.Until(expiresAtVO.Time())
 	if err := s.queue.Enqueue(link.ID, ttl); err != nil {
 		return nil, err
 	}
 
-	// событие создания
 	if s.eventService != nil {
 		eventName, payload := public_link.NewPublicLinkCreatedEvent(link)
 		_, _ = s.eventService.Create(eventName, payload)
@@ -128,8 +120,6 @@ func (s *PublicLinkService) Expire(id uuid.UUID) error {
 
 	return nil
 }
-
-// --- Queries ---
 
 func (s *PublicLinkService) GetByID(id uuid.UUID) (*public_link.PublicLink, error) {
 	link, err := s.queryRepo.GetByID(id)

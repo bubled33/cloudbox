@@ -26,7 +26,6 @@ type MagicLink struct {
 	ExpiredAt value_objects.ExpiresAt
 }
 
-// NewMagicLink создаёт новую магическую ссылку с использованием Value Objects
 func NewMagicLink(
 	userID uuid.UUID,
 	tokenHash value_objects.TokenHash,

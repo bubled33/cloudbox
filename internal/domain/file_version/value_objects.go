@@ -5,7 +5,6 @@ import (
 	"fmt"
 )
 
-// S3Key VO для ключа S3
 type S3Key struct {
 	value string
 }
@@ -21,7 +20,6 @@ func (k S3Key) String() string {
 	return k.value
 }
 
-// MimeType VO для MIME типа файла
 type MimeType struct {
 	value string
 }
@@ -30,7 +28,6 @@ func NewMimeType(value string) (MimeType, error) {
 	if value == "" {
 		return MimeType{}, errors.New("MIME type cannot be empty")
 	}
-	// можно добавить проверку допустимых MIME типов
 	return MimeType{value: value}, nil
 }
 
@@ -38,7 +35,6 @@ func (m MimeType) String() string {
 	return m.value
 }
 
-// FileSize VO для размера файла
 type FileSize struct {
 	value uint64
 }
@@ -56,7 +52,6 @@ func (s FileSize) Uint64() uint64 {
 	return s.value
 }
 
-// FileVersionNum VO для номера версии файла
 type FileVersionNum struct {
 	value int
 }
@@ -72,7 +67,10 @@ func (v FileVersionNum) Int() int {
 	return v.value
 }
 
-// FileStatus VO для статуса файла
+func (v FileVersionNum) Equal(o FileVersionNum) bool {
+	return v.value == o.value
+}
+
 type FileStatus string
 
 const (

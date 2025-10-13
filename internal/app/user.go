@@ -23,8 +23,6 @@ func NewUserService(
 	}
 }
 
-// --- Commands ---
-
 func (s *UserService) Create(rawEmail, rawDisplayName string) (*user.User, error) {
 	email, err := user.NewEmail(rawEmail)
 	if err != nil {

@@ -24,7 +24,6 @@ type Session struct {
 	ExpiresAt  value_objects.ExpiresAt
 }
 
-// NewSession создаёт новую сессию с использованием Value Objects.
 func NewSession(
 	userID uuid.UUID,
 	tokenHash value_objects.TokenHash,
@@ -49,19 +48,16 @@ func NewSession(
 	}
 }
 
-// Revoke помечает сессию как отозванную
 func (s *Session) Revoke() {
 	s.IsRevoked = true
 	s.UpdatedAt = time.Now()
 }
 
-// UpdateLastUsed обновляет время последнего использования
 func (s *Session) UpdateLastUsed() {
 	s.LastUsedAt = time.Now()
 	s.UpdatedAt = time.Now()
 }
 
-// IsExpired проверяет, истекла ли сессия
 func (s *Session) IsExpired() bool {
 	return s.ExpiresAt.IsExpired()
 }

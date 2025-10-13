@@ -27,8 +27,6 @@ func NewSessionService(
 	}
 }
 
-// --- Commands ---
-
 func (s *SessionService) Create(
 	userID uuid.UUID,
 	tokenHashRaw string,
@@ -37,7 +35,6 @@ func (s *SessionService) Create(
 	ip net.IP,
 	expiresAt time.Time,
 ) (*session.Session, error) {
-	// создаём Value Objects
 	tokenHash, err := value_objects.NewTokenHash(tokenHashRaw)
 	if err != nil {
 		return nil, err
@@ -63,14 +60,12 @@ func (s *SessionService) Create(
 		return nil, err
 	}
 
-	// создаём сессию
 	sess := session.NewSession(userID, tokenHash, refreshTokenHash, deviceInfo, ipVO, expiresAtVO)
 
 	if err := s.commandRepo.Save(sess); err != nil {
 		return nil, err
 	}
 
-	// Событие создания сессии
 	if s.eventService != nil {
 		eventName, payload := session.NewSessionCreatedEvent(sess)
 		_, _ = s.eventService.Create(eventName, payload)
@@ -157,8 +152,6 @@ func (s *SessionService) Touch(sessionID uuid.UUID) error {
 	sess.UpdateLastUsed()
 	return s.commandRepo.Save(sess)
 }
-
-// --- Queries ---
 
 func (s *SessionService) GetByID(sessionID uuid.UUID) (*session.Session, error) {
 	sess, err := s.queryRepo.GetByID(sessionID)

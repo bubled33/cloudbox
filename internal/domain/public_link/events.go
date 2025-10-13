@@ -4,14 +4,12 @@ import (
 	"github.com/google/uuid"
 )
 
-// --- Events for PublicLink ---
-
-func NewPublicLinkCreatedEvent(link *public_link.PublicLink) (string, map[string]interface{}) {
+func NewPublicLinkCreatedEvent(link *PublicLink) (string, map[string]interface{}) {
 	return "PublicLinkCreated", map[string]interface{}{
 		"link_id":    link.ID,
 		"file_id":    link.FileID,
 		"created_by": link.CreatedByUserID,
-		"expires_at": link.ExpiresAt,
+		"expires_at": link.ExpiredAt,
 	}
 }
 

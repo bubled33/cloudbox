@@ -17,8 +17,6 @@ type User struct {
 	UpdatedAt time.Time
 }
 
-// --- Constructor ---
-
 func NewUser(email Email, displayName DisplayName) *User {
 	now := time.Now()
 	return &User{
@@ -30,8 +28,6 @@ func NewUser(email Email, displayName DisplayName) *User {
 		UpdatedAt:       now,
 	}
 }
-
-// --- Behavior ---
 
 func (u *User) VerifyEmail() {
 	u.IsEmailVerified = true

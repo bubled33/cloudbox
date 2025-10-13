@@ -24,7 +24,6 @@ type FileVersion struct {
 	UpdatedAt time.Time
 }
 
-// NewFileVersion создаёт новую версию файла с проверкой Value Objects
 func NewFileVersion(
 	fileID uuid.UUID,
 	uploadedBySessionID uuid.UUID,
@@ -49,9 +48,7 @@ func NewFileVersion(
 	}
 }
 
-// SetStatus устанавливает новый статус файла
 func (fv *FileVersion) SetStatus(status FileStatus) error {
-	// проверка статуса через VO конструктор
 	_, err := NewFileStatus(string(status))
 	if err != nil {
 		return err
@@ -61,31 +58,26 @@ func (fv *FileVersion) SetStatus(status FileStatus) error {
 	return nil
 }
 
-// SetPreviewS3Key задаёт ключ превью
 func (fv *FileVersion) SetPreviewS3Key(key S3Key) {
 	fv.PreviewS3Key = &key
 	fv.UpdatedAt = time.Now()
 }
 
-// SetMime задаёт MIME тип файла
 func (fv *FileVersion) SetMime(mime MimeType) {
 	fv.Mime = mime
 	fv.UpdatedAt = time.Now()
 }
 
-// SetSize задаёт размер файла
 func (fv *FileVersion) SetSize(size FileSize) {
 	fv.Size = size
 	fv.UpdatedAt = time.Now()
 }
 
-// SetVersionNum задаёт номер версии файла
 func (fv *FileVersion) SetVersionNum(versionNum FileVersionNum) {
 	fv.VersionNum = versionNum
 	fv.UpdatedAt = time.Now()
 }
 
-// Методы для быстрого обновления статуса через VO
 func (f *FileVersion) MarkUploaded() {
 	f.Status = FileStatusUploaded
 	f.UpdatedAt = time.Now()

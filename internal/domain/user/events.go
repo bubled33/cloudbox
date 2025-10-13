@@ -2,8 +2,6 @@ package user
 
 import "github.com/google/uuid"
 
-// Функции для генерации событий без времени
-
 func NewUserCreatedEvent(u *User) (string, map[string]interface{}) {
 	return "UserCreated", map[string]interface{}{
 		"user_id":      u.ID,

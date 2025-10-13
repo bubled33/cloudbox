@@ -25,7 +25,6 @@ type File struct {
 	UpdatedAt time.Time
 }
 
-// NewFile создаёт новый файл с валидацией всех VO
 func NewFile(
 	ownerID uuid.UUID,
 	name FileName,
@@ -50,13 +49,11 @@ func NewFile(
 	}
 }
 
-// Rename задаёт новое имя файла
 func (f *File) Rename(newName FileName) {
 	f.Name = newName
 	f.UpdatedAt = time.Now()
 }
 
-// UpdateFromVersion обновляет свойства файла из FileVersion VO
 func (f *File) UpdateFromVersion(fv *file_version.FileVersion) {
 	f.Mime = fv.Mime
 	f.PreviewS3Key = fv.PreviewS3Key
@@ -66,7 +63,6 @@ func (f *File) UpdateFromVersion(fv *file_version.FileVersion) {
 	f.UpdatedAt = time.Now()
 }
 
-// Методы для обновления статуса файла через VO
 func (f *File) MarkUploaded() {
 	f.Status = file_version.FileStatusUploaded
 	f.UpdatedAt = time.Now()

@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"time"
 
-	"fyne.io/fyne/v2/storage"
 	"github.com/google/uuid"
 	"github.com/yourusername/cloud-file-storage/internal/domain/file"
 	"github.com/yourusername/cloud-file-storage/internal/domain/file_version"
 	"github.com/yourusername/cloud-file-storage/internal/domain/queue"
+	"github.com/yourusername/cloud-file-storage/internal/domain/storage"
 )
 
 const uploadURLTTL = 15 * time.Minute
@@ -47,8 +47,6 @@ func generateS3Key(ownerID, fileID uuid.UUID, versionNum int, name string) strin
 	return fmt.Sprintf("files/%s/%s/v%d/%s", ownerID, fileID, versionNum, name)
 }
 
-// --- Queries ---
-
 func (s *FileVersionService) GetFileByID(fileID uuid.UUID) (*file.File, error) {
 	return s.fileQueryRepo.GetByID(fileID)
 }
@@ -72,8 +70,6 @@ func (s *FileVersionService) GetAllVersions() ([]*file_version.FileVersion, erro
 	return s.versionQueryRepo.GetAll()
 }
 
-// --- Commands ---
-
 func (s *FileVersionService) UploadNewFile(ownerID, sessionID uuid.UUID, name string, size uint64, mime string) (*file.File, *file_version.FileVersion, string, error) {
 	fileNameVO, err := file.NewFileName(name)
 	if err != nil {
@@ -92,12 +88,12 @@ func (s *FileVersionService) UploadNewFile(ownerID, sessionID uuid.UUID, name st
 	f := file.NewFile(ownerID, fileNameVO, fileSizeVO, mimeVO, versionNumVO, sessionID)
 
 	key := generateS3Key(ownerID, f.ID, versionNumVO.Int(), fileNameVO.String())
-	s3, err := file_version.NewS3Key(key)
+	s3Key, err := file_version.NewS3Key(key)
 	if err != nil {
 		return nil, nil, "", err
 	}
 
-	version := file_version.NewFileVersion(f.ID, sessionID, s3, mimeVO, fileSizeVO, versionNumVO)
+	version := file_version.NewFileVersion(f.ID, sessionID, s3Key, mimeVO, fileSizeVO, versionNumVO)
 
 	if err := s.fileCommandRepo.Save(f); err != nil {
 		return nil, nil, "", err
@@ -106,13 +102,13 @@ func (s *FileVersionService) UploadNewFile(ownerID, sessionID uuid.UUID, name st
 		return nil, nil, "", err
 	}
 
-	uploadURL, err := s.storage.GenerateUploadURL(s3Key, uploadURLTTL)
+	uploadURL, err := s.storage.GenerateUploadURL(s3Key.String(), uploadURLTTL)
 	if err != nil {
 		return nil, nil, "", err
 	}
 
 	if s.eventService != nil {
-		eventName, payload := file.NewFileUploadedEvent(f, version)
+		eventName, payload := file.NewFileVersionUploadedEvent(f.ID, version.ID, ownerID, f.Name.String(), version.VersionNum.Int())
 		_, _ = s.eventService.Create(eventName, payload)
 	}
 
@@ -134,7 +130,12 @@ func (s *FileVersionService) UploadNewVersion(fileID, ownerID, sessionID uuid.UU
 	versionNumVO, _ := file_version.NewFileVersionNum(versionNum)
 
 	s3Key := generateS3Key(ownerID, f.ID, versionNumVO.Int(), fileNameVO.String())
-	version := file_version.NewFileVersion(f.ID, sessionID, file_version.NewS3Key{s3Key}, mimeVO, fileSizeVO, versionNumVO)
+	if err != nil {
+		return nil, nil, "", err
+	}
+	s3, err := file_version.NewS3Key(s3Key)
+
+	version := file_version.NewFileVersion(f.ID, sessionID, s3, mimeVO, fileSizeVO, versionNumVO)
 
 	f.UpdateFromVersion(version)
 
@@ -151,7 +152,7 @@ func (s *FileVersionService) UploadNewVersion(fileID, ownerID, sessionID uuid.UU
 	}
 
 	if s.eventService != nil {
-		eventName, payload := file.NewFileVersionUploadedEvent(f, version)
+		eventName, payload := file.NewFileVersionUploadedEvent(f.ID, version.ID, ownerID, f.Name.String(), f.VersionNum.Int())
 		_, _ = s.eventService.Create(eventName, payload)
 	}
 
@@ -181,7 +182,7 @@ func (s *FileVersionService) RestoreVersion(fileID, versionID uuid.UUID) error {
 	}
 
 	if s.eventService != nil {
-		eventName, payload := file.NewFileVersionRestoredEvent(f, version)
+		eventName, payload := file.NewFileVersionRestoredEvent(f.ID, version.ID)
 		_, _ = s.eventService.Create(eventName, payload)
 	}
 
@@ -200,7 +201,7 @@ func (s *FileVersionService) DeleteVersion(fileID, versionID uuid.UUID) error {
 	}
 
 	if version.VersionNum.Equal(f.VersionNum) {
-		return file_version.ErrCannotDeleteCurrentVersion
+		return file_version.ErrCannotDeleteCurr
 	}
 	if version.Status.Equal(file_version.FileStatusProcessing) {
 		return file_version.ErrVersionProcessing
@@ -217,7 +218,7 @@ func (s *FileVersionService) DeleteVersion(fileID, versionID uuid.UUID) error {
 	}
 
 	if s.eventService != nil {
-		eventName, payload := file.NewFileVersionDeletedEvent(f, version)
+		eventName, payload := file.NewFileVersionDeletedEvent(f.ID, version.ID)
 		_, _ = s.eventService.Create(eventName, payload)
 	}
 

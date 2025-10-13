@@ -30,8 +30,6 @@ func NewFileService(
 	}
 }
 
-// --- Queries ---
-
 func (s *FileService) GetByID(fileID uuid.UUID) (*file.File, error) {
 	f, err := s.fileQueryRepo.GetByID(fileID)
 	if err != nil {
@@ -51,8 +49,6 @@ func (s *FileService) GetAll() ([]*file.File, error) {
 	return s.fileQueryRepo.GetAll()
 }
 
-// --- Commands ---
-
 func (s *FileService) RenameFile(fileID uuid.UUID, newName string) error {
 	f, err := s.fileQueryRepo.GetByID(fileID)
 	if err != nil {
@@ -62,7 +58,6 @@ func (s *FileService) RenameFile(fileID uuid.UUID, newName string) error {
 		return file.ErrNotFound
 	}
 
-	// создаём VO для имени файла
 	nameVO, err := file.NewFileName(newName)
 	if err != nil {
 		return err
@@ -74,7 +69,6 @@ func (s *FileService) RenameFile(fileID uuid.UUID, newName string) error {
 		return err
 	}
 
-	// событие переименования
 	if s.eventService != nil {
 		eventName, payload := file.NewFileRenamedEvent(f)
 		_, _ = s.eventService.Create(eventName, payload)

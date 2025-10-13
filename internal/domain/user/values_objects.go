@@ -21,8 +21,6 @@ func (e Email) String() string {
 	return e.value
 }
 
-// --- DisplayName ---
-
 type DisplayName struct {
 	value string
 }

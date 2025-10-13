@@ -2,26 +2,23 @@ package file
 
 import (
 	"github.com/google/uuid"
-	"github.com/yourusername/cloud-file-storage/internal/domain/file"
 )
 
-// --- Events for FileService ---
-
-func NewFileRenamedEvent(f *file.File) (string, map[string]interface{}) {
+func NewFileRenamedEvent(f *File) (string, map[string]interface{}) {
 	return "FileRenamed", map[string]interface{}{
 		"file_id": f.ID,
-		"name":    f.Name.String(), // предполагается, что Name — это VO
+		"name":    f.Name.String(),
 	}
 }
 
-func NewFileDeletedEvent(f *file.File) (string, map[string]interface{}) {
+func NewFileDeletedEvent(f *File) (string, map[string]interface{}) {
 	return "FileDeleted", map[string]interface{}{
 		"file_id":  f.ID,
 		"owner_id": f.OwnerID,
 	}
 }
 
-func NewFileCreatedEvent(f *file.File) (string, map[string]interface{}) {
+func NewFileCreatedEvent(f *File) (string, map[string]interface{}) {
 	return "FileCreated", map[string]interface{}{
 		"file_id":  f.ID,
 		"owner_id": f.OwnerID,
