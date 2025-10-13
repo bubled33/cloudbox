@@ -134,6 +134,9 @@ func (s *FileVersionService) UploadNewVersion(fileID, ownerID, sessionID uuid.UU
 		return nil, nil, "", err
 	}
 	s3, err := file_version.NewS3Key(s3Key)
+	if err != nil {
+		return nil, nil, "", err
+	}
 
 	version := file_version.NewFileVersion(f.ID, sessionID, s3, mimeVO, fileSizeVO, versionNumVO)
 
