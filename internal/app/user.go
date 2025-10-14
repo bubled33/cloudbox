@@ -1,6 +1,8 @@
 package app
 
 import (
+	"context"
+
 	"github.com/google/uuid"
 	"github.com/yourusername/cloud-file-storage/internal/domain/user"
 )
@@ -9,87 +11,105 @@ type UserService struct {
 	queryRepo    user.QueryRepository
 	commandRepo  user.CommandRepository
 	eventService EventService
+	uow          UnitOfWork
 }
 
 func NewUserService(
 	queryRepo user.QueryRepository,
 	commandRepo user.CommandRepository,
 	eventService EventService,
+	uow UnitOfWork,
 ) *UserService {
 	return &UserService{
 		queryRepo:    queryRepo,
 		commandRepo:  commandRepo,
 		eventService: eventService,
+		uow:          uow,
 	}
 }
 
-func (s *UserService) Create(rawEmail, rawDisplayName string) (*user.User, error) {
-	email, err := user.NewEmail(rawEmail)
+func (s *UserService) Create(ctx context.Context, rawEmail, rawDisplayName string) (*user.User, error) {
+	var createdUser *user.User
+	err := s.uow.Do(ctx, func(ctx context.Context) error {
+		email, err := user.NewEmail(rawEmail)
+		if err != nil {
+			return err
+		}
+
+		displayName, err := user.NewDisplayName(rawDisplayName)
+		if err != nil {
+			return err
+		}
+
+		u := user.NewUser(email, displayName)
+
+		if err := s.commandRepo.Save(ctx, u); err != nil {
+			return err
+		}
+
+		createdUser = u
+		return nil
+	})
+
 	if err != nil {
 		return nil, err
 	}
 
-	displayName, err := user.NewDisplayName(rawDisplayName)
-	if err != nil {
-		return nil, err
-	}
-
-	u := user.NewUser(email, displayName)
-
-	if err := s.commandRepo.Save(u); err != nil {
-		return nil, err
-	}
-
-	eventType, payload := user.NewUserCreatedEvent(u)
+	eventType, payload := user.NewUserCreatedEvent(createdUser)
 	_, _ = s.eventService.Create(eventType, payload)
 
-	return u, nil
+	return createdUser, nil
 }
 
-func (s *UserService) Delete(id uuid.UUID) error {
-	u, err := s.queryRepo.GetByID(id)
-	if err != nil {
-		return err
-	}
-	if u == nil {
-		return user.ErrNotFound
-	}
+func (s *UserService) Delete(ctx context.Context, id uuid.UUID) error {
+	var u *user.User
+	err := s.uow.Do(ctx, func(ctx context.Context) error {
+		var err error
+		u, err = s.queryRepo.GetByID(ctx, id)
+		if err != nil {
+			return err
+		}
+		if u == nil {
+			return user.ErrNotFound
+		}
 
-	if err := s.commandRepo.Delete(id); err != nil {
+		return s.commandRepo.Delete(ctx, id)
+	})
+
+	if err != nil {
 		return err
 	}
 
 	eventType, payload := user.NewUserDeletedEvent(id)
 	_, _ = s.eventService.Create(eventType, payload)
-
 	return nil
 }
 
-func (s *UserService) VerifyEmail(userID uuid.UUID) error {
-	u, err := s.queryRepo.GetByID(userID)
+func (s *UserService) VerifyEmail(ctx context.Context, userID uuid.UUID) error {
+	err := s.uow.Do(ctx, func(ctx context.Context) error {
+		u, err := s.queryRepo.GetByID(ctx, userID)
+		if err != nil {
+			return err
+		}
+		if u == nil {
+			return user.ErrNotFound
+		}
+
+		u.VerifyEmail()
+		return s.commandRepo.Save(ctx, u)
+	})
+
 	if err != nil {
-		return err
-	}
-	if u == nil {
-		return user.ErrNotFound
-	}
-
-	u.VerifyEmail()
-
-	if err := s.commandRepo.Save(u); err != nil {
 		return err
 	}
 
 	eventType, payload := user.NewUserEmailVerifiedEvent(userID)
 	_, _ = s.eventService.Create(eventType, payload)
-
 	return nil
 }
 
-// --- Queries ---
-
-func (s *UserService) GetByID(id uuid.UUID) (*user.User, error) {
-	u, err := s.queryRepo.GetByID(id)
+func (s *UserService) GetByID(ctx context.Context, id uuid.UUID) (*user.User, error) {
+	u, err := s.queryRepo.GetByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -99,8 +119,8 @@ func (s *UserService) GetByID(id uuid.UUID) (*user.User, error) {
 	return u, nil
 }
 
-func (s *UserService) GetByEmail(email string) (*user.User, error) {
-	u, err := s.queryRepo.GetByEmail(email)
+func (s *UserService) GetByEmail(ctx context.Context, email string) (*user.User, error) {
+	u, err := s.queryRepo.GetByEmail(ctx, email)
 	if err != nil {
 		return nil, err
 	}
@@ -110,6 +130,6 @@ func (s *UserService) GetByEmail(email string) (*user.User, error) {
 	return u, nil
 }
 
-func (s *UserService) GetAll() ([]*user.User, error) {
-	return s.queryRepo.GetAll()
+func (s *UserService) GetAll(ctx context.Context) ([]*user.User, error) {
+	return s.queryRepo.GetAll(ctx)
 }

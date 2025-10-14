@@ -1,14 +1,18 @@
 package user
 
-import uuid "github.com/google/uuid"
+import (
+	"context"
+
+	uuid "github.com/google/uuid"
+)
 
 type QueryRepository interface {
-	GetByID(id uuid.UUID) (*User, error)
-	GetByEmail(email string) (*User, error)
-	GetAll() ([]*User, error)
+	GetByID(ctx context.Context, id uuid.UUID) (*User, error)
+	GetByEmail(ctx context.Context, email string) (*User, error)
+	GetAll(ctx context.Context) ([]*User, error)
 }
 
 type CommandRepository interface {
-	Save(user *User) error
-	Delete(id uuid.UUID) error
+	Save(ctx context.Context, user *User) error
+	Delete(ctx context.Context, id uuid.UUID) error
 }
