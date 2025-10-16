@@ -56,46 +56,10 @@ func NewUserQueryRepository(db *sql.DB) *UserQueryRepository {
 	return &UserQueryRepository{db: db}
 }
 
-func (r *UserQueryRepository) GetByID(ctx context.Context, id uuid.UUID) (*user.User, error) {
-	row := r.db.QueryRowContext(ctx, `
-		SELECT id, email, display_name, is_email_verified, updated_at
-		FROM users
-		WHERE id = $1
-	`, id)
-
-	var u user.User
-	var email, displayName string
-	if err := row.Scan(&u.ID, &email, &displayName, &u.IsEmailVerified, &u.UpdatedAt); err != nil {
-		if err == sql.ErrNoRows {
-			return nil, nil
-		}
-		return nil, err
-	}
-
-	var err error
-
-	u.Email, err = user.NewEmail(email)
-	if err != nil {
-		return nil, err
-	}
-
-	u.DisplayName, err = user.NewDisplayName(displayName)
-	if err != nil {
-		return nil, err
-	}
-	return &u, nil
-}
-
-func (r *UserQueryRepository) GetByEmail(ctx context.Context, email string) (*user.User, error) {
-	row := r.db.QueryRowContext(ctx, `
-		SELECT id, email, display_name, is_email_verified, updated_at
-		FROM users
-		WHERE email = $1
-	`, email)
-
+func scanUser(scanner scannable) (*user.User, error) {
 	var u user.User
 	var dbEmail, displayName string
-	if err := row.Scan(&u.ID, &dbEmail, &displayName, &u.IsEmailVerified, &u.UpdatedAt); err != nil {
+	if err := scanner.Scan(&u.ID, &dbEmail, &displayName, &u.IsEmailVerified, &u.UpdatedAt); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
 		}
@@ -117,6 +81,30 @@ func (r *UserQueryRepository) GetByEmail(ctx context.Context, email string) (*us
 	return &u, nil
 }
 
+func (r *UserQueryRepository) GetByID(ctx context.Context, id uuid.UUID) (*user.User, error) {
+	row := r.db.QueryRowContext(ctx, `
+		SELECT id, email, display_name, is_email_verified, updated_at
+		FROM users
+		WHERE id = $1
+	`, id)
+
+	u, err := scanUser(row)
+	return u, err
+}
+
+func (r *UserQueryRepository) GetByEmail(ctx context.Context, email string) (*user.User, error) {
+	row := r.db.QueryRowContext(ctx, `
+		SELECT id, email, display_name, is_email_verified, updated_at
+		FROM users
+		WHERE email = $1
+	`, email)
+
+	u, err := scanUser(row)
+
+	return u, err
+
+}
+
 func (r *UserQueryRepository) GetAll(ctx context.Context) ([]*user.User, error) {
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT id, email, display_name, is_email_verified, updated_at
@@ -129,14 +117,12 @@ func (r *UserQueryRepository) GetAll(ctx context.Context) ([]*user.User, error) 
 
 	var users []*user.User
 	for rows.Next() {
-		var u user.User
-		var email, displayName string
-		if err := rows.Scan(&u.ID, &email, &displayName, &u.IsEmailVerified, &u.UpdatedAt); err != nil {
+		u, err := scanUser(rows)
+		if err != nil {
 			return nil, err
 		}
-		u.Email, err = user.NewEmail(email)
-		u.DisplayName, err = user.NewDisplayName(displayName)
-		users = append(users, &u)
+
+		users = append(users, u)
 	}
 	return users, nil
 }
