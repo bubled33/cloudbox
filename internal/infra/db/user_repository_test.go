@@ -8,6 +8,7 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/yourusername/cloud-file-storage/internal/domain/user"
 	"github.com/yourusername/cloud-file-storage/internal/infra/db"
 )
 
@@ -91,6 +92,70 @@ func TestUserQueryRepository_GetAll_Success(t *testing.T) {
 	require.Equal(t, "John Doe", users[0].DisplayName.String())
 	require.True(t, users[0].IsEmailVerified)
 	require.WithinDuration(t, updatedAt, users[0].UpdatedAt, time.Second)
+
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestUserQueryRepository_Save_Success(t *testing.T) {
+	sqlDB, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer sqlDB.Close()
+
+	mock.ExpectBegin()
+	tx, err := sqlDB.Begin()
+	require.NoError(t, err)
+
+	ctx := context.WithValue(context.Background(), "tx", tx)
+	repo := db.NewUserCommandRepository()
+
+	email, err := user.NewEmail("test@example.com")
+	require.NoError(t, err)
+
+	displayName, err := user.NewDisplayName("John Doe")
+	require.NoError(t, err)
+
+	u := user.NewUser(
+		email, displayName,
+	)
+
+	mock.ExpectExec(`INSERT INTO users`).WithArgs(u.ID, u.Email.String(), u.DisplayName.String(), u.IsEmailVerified, u.UpdatedAt).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+
+	err = repo.Save(ctx, u)
+
+	require.NoError(t, err)
+
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestUserQueryRepository_Delete_Success(t *testing.T) {
+	sqlDB, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer sqlDB.Close()
+
+	mock.ExpectBegin()
+	tx, err := sqlDB.Begin()
+	require.NoError(t, err)
+
+	ctx := context.WithValue(context.Background(), "tx", tx)
+	repo := db.NewUserCommandRepository()
+
+	email, err := user.NewEmail("test@example.com")
+	require.NoError(t, err)
+
+	displayName, err := user.NewDisplayName("John Doe")
+	require.NoError(t, err)
+
+	u := user.NewUser(
+		email, displayName,
+	)
+
+	mock.ExpectExec(`DELETE FROM users WHERE id = \$1`).WithArgs(u.ID).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+
+	err = repo.Delete(ctx, u.ID)
+
+	require.NoError(t, err)
 
 	require.NoError(t, mock.ExpectationsWereMet())
 }
