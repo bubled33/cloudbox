@@ -5,10 +5,52 @@ import (
 	"database/sql"
 
 	uuid "github.com/google/uuid"
+	"github.com/yourusername/cloud-file-storage/internal/domain/domainerrors"
 	"github.com/yourusername/cloud-file-storage/internal/domain/file_version"
 )
 
 type FileVersionCommandRepository struct {
+}
+
+func (r *FileVersionCommandRepository) Save(ctx context.Context, v *file_version.FileVersion) error {
+	tx, ok := ctx.Value("tx").(*sql.Tx)
+	if !ok {
+		return domainerrors.ErrTransactionNotFound
+	}
+
+	query := `
+	INSERT INTO users (id, s3_key, preview_s3_key, mime, status, size, version_num,
+		       file_id, uploaded_by_session_id, created_at, updated_at)
+	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+	ON CONFLICT (id) DO UPDATE 
+	SET s3_key = $2, preview_s3_key = $3, mime = $4, status = $5, size = $6, version_num = $7,
+		       file_id = $8, uploaded_by_session_id = $9, created_at = $10, updated_at = $11
+	`
+	_, err := tx.ExecContext(ctx, query,
+		v.ID,
+		v.S3Key.String(),
+		v.PreviewS3Key.String(),
+		v.Mime.String(),
+		v.Status.String(),
+		v.Size,
+		v.VersionNum,
+		v.FileId,
+		v.UploadedBySessionId,
+		v.CreatedAt,
+		v.UpdatedAt,
+	)
+	return err
+}
+
+func (r *FileVersionCommandRepository) Delete(ctx context.Context, id uuid.UUID) error {
+	tx, ok := ctx.Value("tx").(*sql.Tx)
+	if !ok {
+		return domainerrors.ErrTransactionNotFound
+	}
+
+	query := `DELETE FROM file_versions WHERE id = $1`
+	_, err := tx.ExecContext(ctx, query, id)
+	return err
 }
 
 func NewFileVersionCommandRepository() *FileVersionCommandRepository {

@@ -5,11 +5,70 @@ import (
 	"database/sql"
 
 	uuid "github.com/google/uuid"
+	"github.com/yourusername/cloud-file-storage/internal/domain/domainerrors"
 	"github.com/yourusername/cloud-file-storage/internal/domain/file"
 	"github.com/yourusername/cloud-file-storage/internal/domain/file_version"
 )
 
 type FileCommandRepository struct {
+}
+
+// type File struct {
+// 	ID                  uuid.UUID
+// 	OwnerID             uuid.UUID
+// 	UploadedBySessionId uuid.UUID
+
+// 	Name         FileName
+// 	Mime         file_version.MimeType
+// 	PreviewS3Key *file_version.S3Key
+
+// 	Status file_version.FileStatus
+
+// 	Size       file_version.FileSize
+// 	VersionNum file_version.FileVersionNum
+
+//		CreatedAt time.Time
+//		UpdatedAt time.Time
+//	}
+func (r *FileCommandRepository) Save(ctx context.Context, v *file.File) error {
+	tx, ok := ctx.Value("tx").(*sql.Tx)
+	if !ok {
+		return domainerrors.ErrTransactionNotFound
+	}
+
+	query := `
+	INSERT INTO files (id, name, preview_s3_key, mime, status, size, version_num,
+		       owner_id, uploaded_by_session_id, created_at, updated_at)
+	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+	ON CONFLICT (id) DO UPDATE 
+	SET s3_key = $2, preview_s3_key = $3, mime = $4, status = $5, size = $6, version_num = $7,
+		       file_id = $8, uploaded_by_session_id = $9, created_at = $10, updated_at = $11
+	`
+	_, err := tx.ExecContext(ctx, query,
+		v.ID,
+		v.Name.String(),
+		v.PreviewS3Key.String(),
+		v.Mime.String(),
+		v.Status.String(),
+		v.Size,
+		v.VersionNum,
+		v.OwnerID,
+		v.UploadedBySessionId,
+		v.CreatedAt,
+		v.UpdatedAt,
+	)
+	return err
+}
+
+func (r *FileCommandRepository) Delete(ctx context.Context, id uuid.UUID) error {
+	tx, ok := ctx.Value("tx").(*sql.Tx)
+	if !ok {
+		return domainerrors.ErrTransactionNotFound
+	}
+
+	query := `DELETE FROM files WHERE id = $1`
+	_, err := tx.ExecContext(ctx, query, id)
+	return err
 }
 
 func NewFileCommandRepository() *FileCommandRepository {

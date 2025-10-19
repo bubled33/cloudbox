@@ -7,9 +7,13 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/yourusername/cloud-file-storage/internal/domain/domainerrors"
 	"github.com/yourusername/cloud-file-storage/internal/domain/magic_link"
 	"github.com/yourusername/cloud-file-storage/internal/domain/value_objects"
 )
+
+type MagicLinkCommandRepository struct {
+}
 
 type MagicLinkQueryRepository struct {
 	db *sql.DB
@@ -19,6 +23,47 @@ func NewMagicLinkQueryRepository(db *sql.DB) *MagicLinkQueryRepository {
 	return &MagicLinkQueryRepository{db: db}
 }
 
+func (r *MagicLinkQueryRepository) Save(ctx context.Context, m magic_link.MagicLink) error {
+	tx, ok := ctx.Value("tx").(*sql.Tx)
+	if !ok {
+		return domainerrors.ErrTransactionNotFound
+	}
+
+	query := `
+	INSERT INTO magic_links (id, user_id, token_hash, device_info, purpose, ip,
+		       is_used, is_expired, used_at, created_at, updated_at, expired_at)
+	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+	ON CONFLICT (id) DO UPDATE 
+	SET file_id = $2, created_by_user_id = $3, token_hash = $4, is_expired = $5, created_at = $6, updated_at = $7,
+		       expired_at = $8
+	`
+	_, err := tx.ExecContext(ctx, query,
+		m.ID,
+		m.UserID,
+		m.TokenHash,
+		m.DeviceInfo,
+		m.Purpose,
+		m.Ip,
+		m.IsUsed,
+		m.IsExpired,
+		m.UsedAt,
+		m.CreatedAt,
+		m.UpdatedAt,
+		m.ExpiredAt,
+	)
+	return err
+}
+
+func (r *MagicLinkCommandRepository) Delete(ctx context.Context, id uuid.UUID) error {
+	tx, ok := ctx.Value("tx").(*sql.Tx)
+	if !ok {
+		return domainerrors.ErrTransactionNotFound
+	}
+
+	query := `DELETE FROM magic_links WHERE id = $1`
+	_, err := tx.ExecContext(ctx, query, id)
+	return err
+}
 func scanMagicLink(scanner scannable) (*magic_link.MagicLink, error) {
 	var m magic_link.MagicLink
 	var tokenHashStr, deviceInfoStr, ipStr, purposeStr string
@@ -81,7 +126,7 @@ func scanMagicLink(scanner scannable) (*magic_link.MagicLink, error) {
 func (r *MagicLinkQueryRepository) GetByID(ctx context.Context, id uuid.UUID) (*magic_link.MagicLink, error) {
 	row := r.db.QueryRowContext(ctx, `
 		SELECT id, user_id, token_hash, device_info, purpose, ip,
-		       is_used, is_expired, used_at, created_at, updated_at, expires_at
+		       is_used, is_expired, used_at, created_at, updated_at, expired_at
 		FROM magic_links
 		WHERE id = $1
 	`, id)
@@ -96,7 +141,7 @@ func (r *MagicLinkQueryRepository) GetByID(ctx context.Context, id uuid.UUID) (*
 func (r *MagicLinkQueryRepository) GetByTokenHash(ctx context.Context, token value_objects.TokenHash) (*magic_link.MagicLink, error) {
 	row := r.db.QueryRowContext(ctx, `
 		SELECT id, user_id, token_hash, device_info, purpose, ip,
-		       is_used, is_expired, used_at, created_at, updated_at, expires_at
+		       is_used, is_expired, used_at, created_at, updated_at, expired_at
 		FROM magic_links
 		WHERE token_hash = $1
 	`, token.String())
@@ -111,7 +156,7 @@ func (r *MagicLinkQueryRepository) GetByTokenHash(ctx context.Context, token val
 func (r *MagicLinkQueryRepository) GetByUserID(ctx context.Context, userID uuid.UUID) ([]*magic_link.MagicLink, error) {
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT id, user_id, token_hash, device_info, purpose, ip,
-		       is_used, is_expired, used_at, created_at, updated_at, expires_at
+		       is_used, is_expired, used_at, created_at, updated_at, expired_at
 		FROM magic_links
 		WHERE user_id = $1
 	`, userID)
@@ -139,7 +184,7 @@ func (r *MagicLinkQueryRepository) GetByUserID(ctx context.Context, userID uuid.
 func (r *MagicLinkQueryRepository) GetAll(ctx context.Context) ([]*magic_link.MagicLink, error) {
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT id, user_id, token_hash, device_info, purpose, ip,
-		       is_used, is_expired, used_at, created_at, updated_at, expires_at
+		       is_used, is_expired, used_at, created_at, updated_at, expired_at
 		FROM magic_links
 	`)
 	if err != nil {

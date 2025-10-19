@@ -5,8 +5,50 @@ import (
 	"database/sql"
 
 	"github.com/google/uuid"
+	"github.com/yourusername/cloud-file-storage/internal/domain/domainerrors"
 	"github.com/yourusername/cloud-file-storage/internal/domain/public_link"
 )
+
+type PublicLinkCommandRepository struct {
+}
+
+func (r *PublicLinkCommandRepository) Save(ctx context.Context, p public_link.PublicLink) error {
+	tx, ok := ctx.Value("tx").(*sql.Tx)
+	if !ok {
+		return domainerrors.ErrTransactionNotFound
+	}
+
+	query := `
+	INSERT INTO files (id, file_id, created_by_user_id, token_hash, is_expired,
+		       created_at, updated_at, expired_at)
+	VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+	ON CONFLICT (id) DO UPDATE 
+	SET file_id = $2, created_by_user_id = $3, token_hash = $4, is_expired = $5, created_at = $6, updated_at = $7,
+		       expired_at = $8
+	`
+	_, err := tx.ExecContext(ctx, query,
+		p.ID,
+		p.FileID,
+		p.CreatedByUserID,
+		p.TokenHash,
+		p.IsExpired,
+		p.CreatedAt,
+		p.UpdatedAt,
+		p.ExpiredAt,
+	)
+	return err
+}
+
+func (r *PublicLinkCommandRepository) Delete(ctx context.Context, id uuid.UUID) error {
+	tx, ok := ctx.Value("tx").(*sql.Tx)
+	if !ok {
+		return domainerrors.ErrTransactionNotFound
+	}
+
+	query := `DELETE FROM public_links WHERE id = $1`
+	_, err := tx.ExecContext(ctx, query, id)
+	return err
+}
 
 type PublicLinkQueryRepository struct {
 	db *sql.DB

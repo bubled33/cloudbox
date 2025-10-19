@@ -6,11 +6,53 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/yourusername/cloud-file-storage/internal/domain/domainerrors"
 	"github.com/yourusername/cloud-file-storage/internal/domain/session"
 	"github.com/yourusername/cloud-file-storage/internal/domain/value_objects"
 )
 
 type SessionCommandRepository struct{}
+
+func (r *SessionCommandRepository) Save(ctx context.Context, s session.Session) error {
+	tx, ok := ctx.Value("tx").(*sql.Tx)
+	if !ok {
+		return domainerrors.ErrTransactionNotFound
+	}
+
+	query := `
+	INSERT INTO sessions (id, token_hash, refresh_token_hash, device_info, ip, is_revoked,
+		       user_id, last_used_at, created_at, updated_at, expires_at)
+	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+	ON CONFLICT (id) DO UPDATE 
+	SET s3_key = $2, preview_s3_key = $3, mime = $4, status = $5, size = $6, version_num = $7,
+		       file_id = $8, uploaded_by_session_id = $9, created_at = $10, updated_at = $11
+	`
+	_, err := tx.ExecContext(ctx, query,
+		s.ID,
+		s.TokenHash.String(),
+		s.RefreshTokenHash.String(),
+		s.DeviceInfo.String(),
+		s.Ip.String(),
+		s.IsRevoked,
+		s.UserID,
+		s.LastUsedAt,
+		s.CreatedAt,
+		s.UpdatedAt,
+		s.ExpiresAt,
+	)
+	return err
+}
+
+func (r *SessionCommandRepository) Delete(ctx context.Context, id uuid.UUID) error {
+	tx, ok := ctx.Value("tx").(*sql.Tx)
+	if !ok {
+		return domainerrors.ErrTransactionNotFound
+	}
+
+	query := `DELETE FROM sessions WHERE id = $1`
+	_, err := tx.ExecContext(ctx, query, id)
+	return err
+}
 
 func NewSessionCommandRepository() *SessionCommandRepository {
 	return &SessionCommandRepository{}
