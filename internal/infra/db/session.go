@@ -38,7 +38,7 @@ func (r *SessionCommandRepository) Save(ctx context.Context, s session.Session) 
 		s.LastUsedAt,
 		s.CreatedAt,
 		s.UpdatedAt,
-		s.ExpiresAt,
+		s.ExpiresAt.Time(),
 	)
 	return err
 }

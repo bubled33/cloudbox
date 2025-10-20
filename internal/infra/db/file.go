@@ -13,23 +13,6 @@ import (
 type FileCommandRepository struct {
 }
 
-// type File struct {
-// 	ID                  uuid.UUID
-// 	OwnerID             uuid.UUID
-// 	UploadedBySessionId uuid.UUID
-
-// 	Name         FileName
-// 	Mime         file_version.MimeType
-// 	PreviewS3Key *file_version.S3Key
-
-// 	Status file_version.FileStatus
-
-// 	Size       file_version.FileSize
-// 	VersionNum file_version.FileVersionNum
-
-//		CreatedAt time.Time
-//		UpdatedAt time.Time
-//	}
 func (r *FileCommandRepository) Save(ctx context.Context, v *file.File) error {
 	tx, ok := ctx.Value("tx").(*sql.Tx)
 	if !ok {
@@ -50,8 +33,8 @@ func (r *FileCommandRepository) Save(ctx context.Context, v *file.File) error {
 		v.PreviewS3Key.String(),
 		v.Mime.String(),
 		v.Status.String(),
-		v.Size,
-		v.VersionNum,
+		v.Size.Uint64(),
+		v.VersionNum.Int(),
 		v.OwnerID,
 		v.UploadedBySessionId,
 		v.CreatedAt,
@@ -91,12 +74,12 @@ func scanFile(scanner scannable) (*file.File, error) {
 
 	if err := scanner.Scan(
 		&f.ID,
-		name,
-		previewS3KeyStr,
-		mime,
-		status,
-		size,
-		versionNum,
+		&name,
+		&previewS3KeyStr,
+		&mime,
+		&status,
+		&size,
+		&versionNum,
 		&f.OwnerID,
 		&f.UploadedBySessionId,
 		&f.CreatedAt,

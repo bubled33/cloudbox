@@ -23,7 +23,7 @@ func NewMagicLinkQueryRepository(db *sql.DB) *MagicLinkQueryRepository {
 	return &MagicLinkQueryRepository{db: db}
 }
 
-func (r *MagicLinkQueryRepository) Save(ctx context.Context, m magic_link.MagicLink) error {
+func (r *MagicLinkCommandRepository) Save(ctx context.Context, m magic_link.MagicLink) error {
 	tx, ok := ctx.Value("tx").(*sql.Tx)
 	if !ok {
 		return domainerrors.ErrTransactionNotFound
@@ -34,22 +34,22 @@ func (r *MagicLinkQueryRepository) Save(ctx context.Context, m magic_link.MagicL
 		       is_used, is_expired, used_at, created_at, updated_at, expired_at)
 	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 	ON CONFLICT (id) DO UPDATE 
-	SET file_id = $2, created_by_user_id = $3, token_hash = $4, is_expired = $5, created_at = $6, updated_at = $7,
-		       expired_at = $8
+	SET user_id=$2, token_hash=$3, device_info=$4, purpose=$5, ip=$6,
+		       is_used=$7, is_expire=$8, used_a=$9, created_at=$10, updated_at=$11, expired_at=$12
 	`
 	_, err := tx.ExecContext(ctx, query,
 		m.ID,
 		m.UserID,
-		m.TokenHash,
-		m.DeviceInfo,
-		m.Purpose,
-		m.Ip,
+		m.TokenHash.String(),
+		m.DeviceInfo.String(),
+		m.Purpose.String(),
+		m.Ip.String(),
 		m.IsUsed,
 		m.IsExpired,
 		m.UsedAt,
 		m.CreatedAt,
 		m.UpdatedAt,
-		m.ExpiredAt,
+		m.ExpiredAt.Time(),
 	)
 	return err
 }

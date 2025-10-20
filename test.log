@@ -1,0 +1,110 @@
+FAIL	github.com/yourusername/cloud-file-storage/cmd/api [setup failed]
+FAIL	github.com/yourusername/cloud-file-storage/cmd/link-expirer [setup failed]
+FAIL	github.com/yourusername/cloud-file-storage/cmd/preview-worker [setup failed]
+FAIL	github.com/yourusername/cloud-file-storage/internal/api/handlers [setup failed]
+FAIL	github.com/yourusername/cloud-file-storage/pkg/auth [setup failed]
+FAIL	github.com/yourusername/cloud-file-storage/pkg/errors [setup failed]
+FAIL	github.com/yourusername/cloud-file-storage/pkg/httpclient [setup failed]
+FAIL	github.com/yourusername/cloud-file-storage/pkg/utils [setup failed]
+?   	github.com/yourusername/cloud-file-storage/internal/app	[no test files]
+?   	github.com/yourusername/cloud-file-storage/internal/domain/domainerrors	[no test files]
+?   	github.com/yourusername/cloud-file-storage/internal/domain/event	[no test files]
+?   	github.com/yourusername/cloud-file-storage/internal/domain/file	[no test files]
+?   	github.com/yourusername/cloud-file-storage/internal/domain/file_version	[no test files]
+?   	github.com/yourusername/cloud-file-storage/internal/domain/magic_link	[no test files]
+?   	github.com/yourusername/cloud-file-storage/internal/domain/public_link	[no test files]
+?   	github.com/yourusername/cloud-file-storage/internal/domain/queue	[no test files]
+?   	github.com/yourusername/cloud-file-storage/internal/domain/session	[no test files]
+?   	github.com/yourusername/cloud-file-storage/internal/domain/storage	[no test files]
+?   	github.com/yourusername/cloud-file-storage/internal/domain/user	[no test files]
+?   	github.com/yourusername/cloud-file-storage/internal/domain/value_objects	[no test files]
+=== RUN   TestFileCommandRepository_Save_Success
+--- PASS: TestFileCommandRepository_Save_Success (0.00s)
+=== RUN   TestFileCommandRepository_Save_NoTransaction
+--- PASS: TestFileCommandRepository_Save_NoTransaction (0.00s)
+=== RUN   TestFileCommandRepository_Delete_Success
+--- PASS: TestFileCommandRepository_Delete_Success (0.00s)
+=== RUN   TestFileCommandRepository_Delete_NoTransaction
+--- PASS: TestFileCommandRepository_Delete_NoTransaction (0.00s)
+=== RUN   TestFileQueryRepository_GetByID_Success
+--- PASS: TestFileQueryRepository_GetByID_Success (0.00s)
+=== RUN   TestFileQueryRepository_GetByID_NoRows
+--- PASS: TestFileQueryRepository_GetByID_NoRows (0.00s)
+=== RUN   TestFileQueryRepository_GetAll_Success
+--- PASS: TestFileQueryRepository_GetAll_Success (0.00s)
+=== RUN   TestFileVersionCommandRepository_Save_Success
+--- PASS: TestFileVersionCommandRepository_Save_Success (0.00s)
+=== RUN   TestFileVersionCommandRepository_Save_NoTransaction
+--- PASS: TestFileVersionCommandRepository_Save_NoTransaction (0.00s)
+=== RUN   TestFileVersionCommandRepository_Delete_Success
+--- PASS: TestFileVersionCommandRepository_Delete_Success (0.00s)
+=== RUN   TestFileVersionCommandRepository_Delete_NoTransaction
+--- PASS: TestFileVersionCommandRepository_Delete_NoTransaction (0.00s)
+=== RUN   TestFileVersionQueryRepository_GetByID_Success
+--- PASS: TestFileVersionQueryRepository_GetByID_Success (0.00s)
+=== RUN   TestFileVersionQueryRepository_GetByID_NoRows
+--- PASS: TestFileVersionQueryRepository_GetByID_NoRows (0.00s)
+=== RUN   TestMagicLinkCommandRepository_Save_Success
+--- PASS: TestMagicLinkCommandRepository_Save_Success (0.00s)
+=== RUN   TestMagicLinkCommandRepository_Save_NoTransaction
+--- PASS: TestMagicLinkCommandRepository_Save_NoTransaction (0.00s)
+=== RUN   TestMagicLinkCommandRepository_Delete_Success
+--- PASS: TestMagicLinkCommandRepository_Delete_Success (0.00s)
+=== RUN   TestMagicLinkCommandRepository_Delete_NoTransaction
+--- PASS: TestMagicLinkCommandRepository_Delete_NoTransaction (0.00s)
+=== RUN   TestMagicLinkQueryRepository_GetByID_Success
+--- PASS: TestMagicLinkQueryRepository_GetByID_Success (0.00s)
+=== RUN   TestMagicLinkQueryRepository_GetByID_NoRows
+--- PASS: TestMagicLinkQueryRepository_GetByID_NoRows (0.00s)
+=== RUN   TestMagicLinkQueryRepository_GetAll_Success
+--- PASS: TestMagicLinkQueryRepository_GetAll_Success (0.00s)
+=== RUN   TestPublicLinkCommandRepository_Save_Success
+--- PASS: TestPublicLinkCommandRepository_Save_Success (0.00s)
+=== RUN   TestPublicLinkCommandRepository_Save_NoTransaction
+--- PASS: TestPublicLinkCommandRepository_Save_NoTransaction (0.00s)
+=== RUN   TestPublicLinkCommandRepository_Delete_Success
+--- PASS: TestPublicLinkCommandRepository_Delete_Success (0.00s)
+=== RUN   TestPublicLinkCommandRepository_Delete_NoTransaction
+--- PASS: TestPublicLinkCommandRepository_Delete_NoTransaction (0.00s)
+=== RUN   TestPublicLinkQueryRepository_GetByID_Success
+--- PASS: TestPublicLinkQueryRepository_GetByID_Success (0.00s)
+=== RUN   TestPublicLinkQueryRepository_GetByID_NoRows
+--- PASS: TestPublicLinkQueryRepository_GetByID_NoRows (0.00s)
+=== RUN   TestPublicLinkQueryRepository_GetByFileID_Success
+--- PASS: TestPublicLinkQueryRepository_GetByFileID_Success (0.00s)
+=== RUN   TestPublicLinkQueryRepository_GetAll_Success
+--- PASS: TestPublicLinkQueryRepository_GetAll_Success (0.00s)
+=== RUN   TestSessionQueryRepository_GetByID_Success
+--- PASS: TestSessionQueryRepository_GetByID_Success (0.00s)
+=== RUN   TestSessionQueryRepository_GetByUserID_Success
+--- PASS: TestSessionQueryRepository_GetByUserID_Success (0.00s)
+=== RUN   TestSessionQueryRepository_GetAll_Success
+--- PASS: TestSessionQueryRepository_GetAll_Success (0.00s)
+=== RUN   TestSessionCommandRepository_Save_Success
+--- PASS: TestSessionCommandRepository_Save_Success (0.00s)
+=== RUN   TestSessionCommandRepository_Save_NoTx
+--- PASS: TestSessionCommandRepository_Save_NoTx (0.00s)
+=== RUN   TestSessionCommandRepository_Delete_Success
+--- PASS: TestSessionCommandRepository_Delete_Success (0.00s)
+=== RUN   TestSessionCommandRepository_Delete_NoTx
+--- PASS: TestSessionCommandRepository_Delete_NoTx (0.00s)
+=== RUN   TestUserQueryRepository_GetByEmail_Success
+--- PASS: TestUserQueryRepository_GetByEmail_Success (0.00s)
+=== RUN   TestUserQueryRepository_GetByID_Success
+--- PASS: TestUserQueryRepository_GetByID_Success (0.00s)
+=== RUN   TestUserQueryRepository_GetAll_Success
+--- PASS: TestUserQueryRepository_GetAll_Success (0.00s)
+=== RUN   TestUserQueryRepository_Save_Success
+--- PASS: TestUserQueryRepository_Save_Success (0.00s)
+=== RUN   TestUserQueryRepository_Delete_Success
+--- PASS: TestUserQueryRepository_Delete_Success (0.00s)
+PASS
+ok  	github.com/yourusername/cloud-file-storage/internal/infra/db	0.280s
+?   	github.com/yourusername/cloud-file-storage/internal/infra/logger	[no test files]
+?   	github.com/yourusername/cloud-file-storage/internal/infra/queue	[no test files]
+?   	github.com/yourusername/cloud-file-storage/internal/infra/storage	[no test files]
+?   	github.com/yourusername/cloud-file-storage/internal/workers	[no test files]
+testing: warning: no tests to run
+PASS
+ok  	github.com/yourusername/cloud-file-storage/tests/intergration	(cached) [no tests to run]
+FAIL

@@ -1,4 +1,4 @@
-package db_test
+package db
 
 import (
 	"context"
@@ -9,7 +9,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yourusername/cloud-file-storage/internal/domain/user"
-	"github.com/yourusername/cloud-file-storage/internal/infra/db"
 )
 
 func TestUserQueryRepository_GetByEmail_Success(t *testing.T) {
@@ -17,7 +16,7 @@ func TestUserQueryRepository_GetByEmail_Success(t *testing.T) {
 	require.NoError(t, err)
 	defer sqlDB.Close()
 
-	repo := db.NewUserQueryRepository(sqlDB)
+	repo := NewUserQueryRepository(sqlDB)
 
 	id := uuid.New()
 	updatedAt := time.Now()
@@ -45,7 +44,7 @@ func TestUserQueryRepository_GetByID_Success(t *testing.T) {
 	require.NoError(t, err)
 	defer sqlDB.Close()
 
-	repo := db.NewUserQueryRepository(sqlDB)
+	repo := NewUserQueryRepository(sqlDB)
 
 	id := uuid.New()
 	updatedAt := time.Now()
@@ -73,7 +72,7 @@ func TestUserQueryRepository_GetAll_Success(t *testing.T) {
 	require.NoError(t, err)
 	defer sqlDB.Close()
 
-	repo := db.NewUserQueryRepository(sqlDB)
+	repo := NewUserQueryRepository(sqlDB)
 
 	id := uuid.New()
 	updatedAt := time.Now()
@@ -106,7 +105,7 @@ func TestUserQueryRepository_Save_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	ctx := context.WithValue(context.Background(), "tx", tx)
-	repo := db.NewUserCommandRepository()
+	repo := NewUserCommandRepository()
 
 	email, err := user.NewEmail("test@example.com")
 	require.NoError(t, err)
@@ -138,7 +137,7 @@ func TestUserQueryRepository_Delete_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	ctx := context.WithValue(context.Background(), "tx", tx)
-	repo := db.NewUserCommandRepository()
+	repo := NewUserCommandRepository()
 
 	email, err := user.NewEmail("test@example.com")
 	require.NoError(t, err)
