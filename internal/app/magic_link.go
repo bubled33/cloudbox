@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"net"
 	"time"
 
@@ -13,27 +14,30 @@ import (
 const magicLinkTTL = 5 * time.Minute
 
 type MagicLinkService struct {
-	queryRepo    magic_link.QueryRepository
-	commandRepo  magic_link.CommandRepository
-	queue        queue.Expirer
-	eventService *EventService
+	queryRepo       magic_link.QueryRepository
+	commandRepo     magic_link.CommandRepository
+	expirerProducer queue.ExpirerProducer
+	expirerConsumer queue.ExpirerConsumer
+	eventService    *EventService
 }
 
 func NewMagicLinkService(
 	queryRepo magic_link.QueryRepository,
 	commandRepo magic_link.CommandRepository,
-	queue queue.Expirer,
+	expirerProducer queue.ExpirerProducer,
+	expirerConsumer queue.ExpirerConsumer,
 	eventService *EventService,
 ) *MagicLinkService {
 	return &MagicLinkService{
-		queryRepo:    queryRepo,
-		commandRepo:  commandRepo,
-		queue:        queue,
-		eventService: eventService,
+		queryRepo:       queryRepo,
+		commandRepo:     commandRepo,
+		expirerProducer: expirerProducer,
+		eventService:    eventService,
 	}
 }
 
 func (s *MagicLinkService) Create(
+	ctx context.Context,
 	userID uuid.UUID,
 	tokenHashRaw string,
 	deviceInfoRaw string,
@@ -71,7 +75,7 @@ func (s *MagicLinkService) Create(
 		return nil, err
 	}
 
-	if err := s.queue.Enqueue(link.ID, magicLinkTTL); err != nil {
+	if err := s.expirerProducer.Produce(ctx, link.ID, magicLinkTTL); err != nil {
 		return nil, err
 	}
 
@@ -131,7 +135,7 @@ func (s *MagicLinkService) Expire(id uuid.UUID) error {
 	return nil
 }
 
-func (s *MagicLinkService) Delete(id uuid.UUID) error {
+func (s *MagicLinkService) Delete(ctx context.Context, id uuid.UUID) error {
 	link, err := s.queryRepo.GetByID(id)
 	if err != nil {
 		return err
@@ -144,7 +148,7 @@ func (s *MagicLinkService) Delete(id uuid.UUID) error {
 		return err
 	}
 
-	_ = s.queue.Remove(id)
+	_ = s.expirerConsumer.Remove(ctx, id)
 
 	if s.eventService != nil {
 		eventName, payload := magic_link.NewMagicLinkDeletedEvent(link)
@@ -189,7 +193,7 @@ func (s *MagicLinkService) GetAll() ([]*magic_link.MagicLink, error) {
 	return s.queryRepo.GetAll()
 }
 
-func (s *MagicLinkService) CleanupExpired() error {
+func (s *MagicLinkService) CleanupExpired(ctx context.Context) error {
 	links, err := s.queryRepo.GetAll()
 	if err != nil {
 		return err
@@ -197,7 +201,7 @@ func (s *MagicLinkService) CleanupExpired() error {
 
 	for _, link := range links {
 		if link.IsExpired {
-			if err := s.Delete(link.ID); err != nil {
+			if err := s.Delete(ctx, link.ID); err != nil {
 				return err
 			}
 		}

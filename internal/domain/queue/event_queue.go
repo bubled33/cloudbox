@@ -1,7 +1,15 @@
 package queue
 
-import "github.com/yourusername/cloud-file-storage/internal/domain/event"
+import (
+	"context"
 
-type EventQueue interface {
-	Enqueue(event *event.Event) error
+	"github.com/yourusername/cloud-file-storage/internal/domain/event"
+)
+
+type EventProducer interface {
+	Produce(ctx context.Context, event *event.Event) error
+}
+
+type EventConsumer interface {
+	Consume(ctx context.Context) (*event.Event, error)
 }

@@ -27,10 +27,10 @@ func (p *KafkaEventProducer) Produce(ctx context.Context, e *event.Event) error 
 }
 
 type KafkaEventConsumer struct {
-	reader *kafka.Reader
+	reader KafkaReader
 }
 
-func NewKafkaEventConsumer(reader *kafka.Reader) *KafkaEventConsumer {
+func NewKafkaEventConsumer(reader KafkaReader) *KafkaEventConsumer {
 	return &KafkaEventConsumer{reader: reader}
 }
 

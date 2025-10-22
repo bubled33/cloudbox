@@ -99,9 +99,12 @@ FAIL	github.com/yourusername/cloud-file-storage/pkg/utils [setup failed]
 === RUN   TestUserQueryRepository_Delete_Success
 --- PASS: TestUserQueryRepository_Delete_Success (0.00s)
 PASS
-ok  	github.com/yourusername/cloud-file-storage/internal/infra/db	0.280s
+ok  	github.com/yourusername/cloud-file-storage/internal/infra/db	0.352s
 ?   	github.com/yourusername/cloud-file-storage/internal/infra/logger	[no test files]
-?   	github.com/yourusername/cloud-file-storage/internal/infra/queue	[no test files]
+=== RUN   TestKafkaEventProducer_Produce_Success
+--- PASS: TestKafkaEventProducer_Produce_Success (0.00s)
+PASS
+ok  	github.com/yourusername/cloud-file-storage/internal/infra/queue	0.646s
 ?   	github.com/yourusername/cloud-file-storage/internal/infra/storage	[no test files]
 ?   	github.com/yourusername/cloud-file-storage/internal/workers	[no test files]
 testing: warning: no tests to run

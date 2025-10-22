@@ -1,13 +1,17 @@
 package queue
 
 import (
+	"context"
 	"time"
 
 	"github.com/google/uuid"
 )
 
-type Expirer interface {
-	Enqueue(linkID uuid.UUID, duration time.Duration) error
+type ExpirerProducer interface {
+	Produce(ctx context.Context, linkID uuid.UUID, duration time.Duration) error
+}
 
-	Remove(linkID uuid.UUID) error
+type ExpirerConsumer interface {
+	Consume(ctx context.Context) (uuid.UUID, time.Duration, error)
+	Remove(ctx context.Context, linkID uuid.UUID) error
 }

@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -19,7 +20,7 @@ type FileVersionService struct {
 	versionQueryRepo   file_version.QueryRepository
 	versionCommandRepo file_version.CommandRepository
 	storage            storage.Storage
-	previewQueue       queue.PreviewQueue
+	previewConsumer    queue.PreviewConsumer
 	eventService       *EventService
 }
 
@@ -29,7 +30,7 @@ func NewFileVersionService(
 	versionQueryRepo file_version.QueryRepository,
 	versionCommandRepo file_version.CommandRepository,
 	storage storage.Storage,
-	previewQueue queue.PreviewQueue,
+	previewConsumer queue.PreviewConsumer,
 	eventService *EventService,
 ) *FileVersionService {
 	return &FileVersionService{
@@ -38,7 +39,7 @@ func NewFileVersionService(
 		versionQueryRepo:   versionQueryRepo,
 		versionCommandRepo: versionCommandRepo,
 		storage:            storage,
-		previewQueue:       previewQueue,
+		previewConsumer:    previewConsumer,
 		eventService:       eventService,
 	}
 }
@@ -192,7 +193,7 @@ func (s *FileVersionService) RestoreVersion(fileID, versionID uuid.UUID) error {
 	return nil
 }
 
-func (s *FileVersionService) DeleteVersion(fileID, versionID uuid.UUID) error {
+func (s *FileVersionService) DeleteVersion(ctx context.Context, fileID, versionID uuid.UUID) error {
 	f, err := s.fileQueryRepo.GetByID(fileID)
 	if err != nil || f == nil {
 		return file.ErrNotFound
@@ -211,7 +212,7 @@ func (s *FileVersionService) DeleteVersion(fileID, versionID uuid.UUID) error {
 	}
 
 	if version.PreviewS3Key != nil {
-		_ = s.previewQueue.Remove(version.ID)
+		_ = s.previewConsumer.Remove(ctx, version.ID)
 		_ = s.storage.Delete(version.PreviewS3Key.String())
 	}
 	_ = s.storage.Delete(version.S3Key.String())

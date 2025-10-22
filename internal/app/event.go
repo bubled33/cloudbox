@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/yourusername/cloud-file-storage/internal/domain/event"
@@ -9,14 +10,14 @@ import (
 
 type EventService struct {
 	repo       event.EventRepository
-	queue      queue.EventQueue
+	producer   queue.EventProducer
 	instanceID string
 }
 
-func NewEventService(repo event.EventRepository, queue queue.EventQueue, instanceID string) *EventService {
+func NewEventService(repo event.EventRepository, producer queue.EventProducer, instanceID string) *EventService {
 	return &EventService{
 		repo:       repo,
-		queue:      queue,
+		producer:   producer,
 		instanceID: instanceID,
 	}
 }
@@ -36,7 +37,7 @@ func (s *EventService) Create(name string, payload any) (*event.Event, error) {
 	return e, nil
 }
 
-func (s *EventService) PublishPending(batchSize int, maxRetries int) error {
+func (s *EventService) PublishPending(ctx context.Context, batchSize int, maxRetries int) error {
 	events, err := s.repo.GetPending(batchSize)
 	if err != nil {
 		return err
@@ -57,7 +58,7 @@ func (s *EventService) PublishPending(batchSize int, maxRetries int) error {
 			}
 		}
 
-		if err := s.queue.Enqueue(e); err != nil {
+		if err := s.producer.Produce(ctx, e); err != nil {
 
 			e.RetryCount++
 			e.Unlock()

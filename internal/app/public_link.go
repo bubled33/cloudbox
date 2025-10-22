@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"errors"
 	"time"
 
@@ -13,27 +14,31 @@ import (
 const defaultPublicLinkTTL = 15 * time.Minute
 
 type PublicLinkService struct {
-	queryRepo    public_link.PublicLinkQueryRepository
-	commandRepo  public_link.PublicLinkCommandRepository
-	queue        queue.Expirer
-	eventService *EventService
+	queryRepo       public_link.PublicLinkQueryRepository
+	commandRepo     public_link.PublicLinkCommandRepository
+	expirerProducer queue.ExpirerProducer
+	expirerConsumer queue.ExpirerConsumer
+	eventService    *EventService
 }
 
 func NewPublicLinkService(
 	queryRepo public_link.PublicLinkQueryRepository,
 	commandRepo public_link.PublicLinkCommandRepository,
-	queue queue.Expirer,
+	expirerProducer queue.ExpirerProducer,
+	expirerConsumer queue.ExpirerConsumer,
 	eventService *EventService,
 ) *PublicLinkService {
 	return &PublicLinkService{
-		queryRepo:    queryRepo,
-		commandRepo:  commandRepo,
-		queue:        queue,
-		eventService: eventService,
+		queryRepo:       queryRepo,
+		commandRepo:     commandRepo,
+		expirerConsumer: expirerConsumer,
+		expirerProducer: expirerProducer,
+		eventService:    eventService,
 	}
 }
 
 func (s *PublicLinkService) Create(
+	ctx context.Context,
 	fileID, createdByUserID uuid.UUID,
 	tokenHashRaw string,
 	expiresAtRaw time.Time,
@@ -61,7 +66,7 @@ func (s *PublicLinkService) Create(
 	}
 
 	ttl := time.Until(expiresAtVO.Time())
-	if err := s.queue.Enqueue(link.ID, ttl); err != nil {
+	if err := s.expirerProducer.Produce(ctx, link.ID, ttl); err != nil {
 		return nil, err
 	}
 
@@ -73,7 +78,7 @@ func (s *PublicLinkService) Create(
 	return link, nil
 }
 
-func (s *PublicLinkService) Delete(id uuid.UUID) error {
+func (s *PublicLinkService) Delete(ctx context.Context, id uuid.UUID) error {
 	link, err := s.queryRepo.GetByID(id)
 	if err != nil {
 		return err
@@ -86,7 +91,7 @@ func (s *PublicLinkService) Delete(id uuid.UUID) error {
 		return err
 	}
 
-	_ = s.queue.Remove(id)
+	_ = s.expirerConsumer.Remove(ctx, id)
 
 	if s.eventService != nil {
 		eventName, payload := public_link.NewPublicLinkDeletedEvent(id)

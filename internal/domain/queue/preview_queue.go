@@ -1,8 +1,16 @@
 package queue
 
-import "github.com/google/uuid"
+import (
+	"context"
 
-type PreviewQueue interface {
-	Enqueue(versionID uuid.UUID) error
-	Remove(versionID uuid.UUID) error
+	"github.com/google/uuid"
+)
+
+type PreviewProducer interface {
+	Produce(ctx context.Context, versionID uuid.UUID) error
+}
+
+type PreviewConsumer interface {
+	Consume(ctx context.Context) (uuid.UUID, error)
+	Remove(ctx context.Context, versionID uuid.UUID) error
 }
