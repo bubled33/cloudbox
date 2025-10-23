@@ -48,6 +48,29 @@ func generateS3Key(ownerID, fileID uuid.UUID, versionNum int, name string) strin
 	return fmt.Sprintf("files/%s/%s/v%d/%s", ownerID, fileID, versionNum, name)
 }
 
+func (s *FileVersionService) UpdatePreview(versionID uuid.UUID, previewKey file_version.S3Key) error {
+	version, err := s.versionQueryRepo.GetByID(versionID)
+	if err != nil {
+		return err
+	}
+	version.MarkReady()
+	version.PreviewS3Key = &previewKey
+	s.versionCommandRepo.Save(version)
+
+	file, err := s.GetFileByID(version.FileId)
+	if err != nil {
+		return err
+	}
+
+	if !file.VersionNum.Equal(version.VersionNum) {
+		return nil
+	}
+	file.PreviewS3Key = &previewKey
+	file.MarkReady()
+	s.fileCommandRepo.Save(file)
+
+	return nil
+}
 func (s *FileVersionService) GetFileByID(fileID uuid.UUID) (*file.File, error) {
 	return s.fileQueryRepo.GetByID(fileID)
 }
@@ -71,7 +94,7 @@ func (s *FileVersionService) GetAllVersions() ([]*file_version.FileVersion, erro
 	return s.versionQueryRepo.GetAll()
 }
 
-func (s *FileVersionService) UploadNewFile(ownerID, sessionID uuid.UUID, name string, size uint64, mime string) (*file.File, *file_version.FileVersion, string, error) {
+func (s *FileVersionService) UploadNewFile(ctx context.Context, ownerID, sessionID uuid.UUID, name string, size uint64, mime string) (*file.File, *file_version.FileVersion, string, error) {
 	fileNameVO, err := file.NewFileName(name)
 	if err != nil {
 		return nil, nil, "", err
@@ -103,7 +126,7 @@ func (s *FileVersionService) UploadNewFile(ownerID, sessionID uuid.UUID, name st
 		return nil, nil, "", err
 	}
 
-	uploadURL, err := s.storage.GenerateUploadURL(s3Key.String(), uploadURLTTL)
+	uploadURL, err := s.storage.GenerateUploadURL(ctx, s3Key.String(), uploadURLTTL)
 	if err != nil {
 		return nil, nil, "", err
 	}
@@ -116,7 +139,7 @@ func (s *FileVersionService) UploadNewFile(ownerID, sessionID uuid.UUID, name st
 	return f, version, uploadURL, nil
 }
 
-func (s *FileVersionService) UploadNewVersion(fileID, ownerID, sessionID uuid.UUID, name string, size uint64, mime string, versionNum int) (*file.File, *file_version.FileVersion, string, error) {
+func (s *FileVersionService) UploadNewVersion(ctx context.Context, fileID, ownerID, sessionID uuid.UUID, name string, size uint64, mime string, versionNum int) (*file.File, *file_version.FileVersion, string, error) {
 	f, err := s.fileQueryRepo.GetByID(fileID)
 	if err != nil {
 		return nil, nil, "", err
@@ -150,7 +173,7 @@ func (s *FileVersionService) UploadNewVersion(fileID, ownerID, sessionID uuid.UU
 		return nil, nil, "", err
 	}
 
-	uploadURL, err := s.storage.GenerateUploadURL(s3Key, uploadURLTTL)
+	uploadURL, err := s.storage.GenerateUploadURL(ctx, s3Key, uploadURLTTL)
 	if err != nil {
 		return nil, nil, "", err
 	}
@@ -213,9 +236,9 @@ func (s *FileVersionService) DeleteVersion(ctx context.Context, fileID, versionI
 
 	if version.PreviewS3Key != nil {
 		_ = s.previewConsumer.Remove(ctx, version.ID)
-		_ = s.storage.Delete(version.PreviewS3Key.String())
+		_ = s.storage.Delete(ctx, version.PreviewS3Key.String())
 	}
-	_ = s.storage.Delete(version.S3Key.String())
+	_ = s.storage.Delete(ctx, version.S3Key.String())
 
 	if err := s.versionCommandRepo.Delete(versionID); err != nil {
 		return err

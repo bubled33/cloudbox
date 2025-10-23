@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"net"
 	"time"
 
@@ -23,9 +24,9 @@ func NewAuthService(mlService *MagicLinkService, sService *SessionService, sessi
 	}
 }
 
-func (a *AuthService) RequestMagicLink(userID uuid.UUID, deviceInfo string, ip net.IP) (*magic_link.MagicLink, error) {
+func (a *AuthService) RequestMagicLink(ctx context.Context, userID uuid.UUID, deviceInfo string, ip net.IP) (*magic_link.MagicLink, error) {
 	tokenHash := generateTokenHash()
-	return a.magicLinkService.Create(userID, tokenHash, deviceInfo, "login", ip)
+	return a.magicLinkService.Create(ctx, userID, tokenHash, deviceInfo, "login", ip)
 }
 
 func (a *AuthService) Authenticate(tokenHash string, ip net.IP) (*session.Session, error) {
