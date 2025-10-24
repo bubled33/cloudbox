@@ -10,7 +10,7 @@ import (
 
 	"github.com/disintegration/imaging"
 	"github.com/google/uuid"
-	"github.com/yourusername/cloud-file-storage/internal/app"
+	file_version_service "github.com/yourusername/cloud-file-storage/internal/app/file_version"
 	"github.com/yourusername/cloud-file-storage/internal/domain/file_version"
 	"github.com/yourusername/cloud-file-storage/internal/domain/queue"
 	"github.com/yourusername/cloud-file-storage/internal/domain/storage"
@@ -19,7 +19,7 @@ import (
 type PreviewWorker struct {
 	storage            storage.Storage
 	consumer           queue.PreviewConsumer
-	fileVersionService app.FileVersionService
+	fileVersionService file_version_service.FileVersionServiceInterface
 
 	thumbWidth  int
 	thumbHeight int
@@ -31,13 +31,17 @@ type PreviewWorker struct {
 func NewPreviewWorker(
 	st storage.Storage,
 	cons queue.PreviewConsumer,
-	fvs app.FileVersionService,
+	fvs file_version_service.FileVersionServiceInterface,
 	opts ...func(*PreviewWorker),
 ) *PreviewWorker {
 	w := &PreviewWorker{
 		storage:            st,
 		consumer:           cons,
 		fileVersionService: fvs,
+		thumbWidth:         200,
+		thumbHeight:        200,
+		format:             imaging.PNG,
+		retryDelay:         500 * time.Millisecond,
 	}
 	for _, opt := range opts {
 		opt(w)
@@ -64,7 +68,7 @@ func WithRetryDelay(retryDelay time.Duration) func(*PreviewWorker) {
 	}
 }
 
-func (w *PreviewWorker) Handle(ctx context.Context, versionID uuid.UUID) error {
+func (w *PreviewWorker) Handle(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
@@ -130,10 +134,10 @@ func (w *PreviewWorker) generateAndUploadImagePreview(ctx context.Context, fileK
 		return err
 	}
 
-	thumb := imaging.Resize(img, 200, 200, imaging.Lanczos)
+	thumb := imaging.Resize(img, w.thumbWidth, w.thumbHeight, imaging.Lanczos)
 
 	var buf bytes.Buffer
-	err = imaging.Encode(&buf, thumb, imaging.PNG)
+	err = imaging.Encode(&buf, thumb, w.format)
 	if err != nil {
 		return err
 	}
@@ -147,7 +151,7 @@ func (w *PreviewWorker) generateAndUploadImagePreview(ctx context.Context, fileK
 }
 
 func isImageFile(fileKey string) bool {
-	ext := filepath.Ext(fileKey)
+	ext := strings.ToLower(filepath.Ext(fileKey))
 	switch ext {
 	case ".jpg", ".jpeg", ".png", ".gif", ".bmp":
 		return true

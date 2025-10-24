@@ -1,4 +1,4 @@
-package app
+package file_version_service
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/yourusername/cloud-file-storage/internal/app"
 	"github.com/yourusername/cloud-file-storage/internal/domain/file"
 	"github.com/yourusername/cloud-file-storage/internal/domain/file_version"
 	"github.com/yourusername/cloud-file-storage/internal/domain/queue"
@@ -21,7 +22,7 @@ type FileVersionService struct {
 	versionCommandRepo file_version.CommandRepository
 	storage            storage.Storage
 	previewConsumer    queue.PreviewConsumer
-	eventService       *EventService
+	eventService       *app.EventService
 }
 
 func NewFileVersionService(
@@ -31,7 +32,7 @@ func NewFileVersionService(
 	versionCommandRepo file_version.CommandRepository,
 	storage storage.Storage,
 	previewConsumer queue.PreviewConsumer,
-	eventService *EventService,
+	eventService *app.EventService,
 ) *FileVersionService {
 	return &FileVersionService{
 		fileQueryRepo:      fileQueryRepo,
