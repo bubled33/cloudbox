@@ -3,8 +3,10 @@ package workers
 import (
 	"bytes"
 	"context"
+	"errors"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/disintegration/imaging"
 	"github.com/google/uuid"
@@ -18,50 +20,105 @@ type PreviewWorker struct {
 	storage            storage.Storage
 	consumer           queue.PreviewConsumer
 	fileVersionService app.FileVersionService
+
+	thumbWidth  int
+	thumbHeight int
+	format      imaging.Format
+
+	retryDelay time.Duration
+}
+
+func NewPreviewWorker(
+	st storage.Storage,
+	cons queue.PreviewConsumer,
+	fvs app.FileVersionService,
+	opts ...func(*PreviewWorker),
+) *PreviewWorker {
+	w := &PreviewWorker{
+		storage:            st,
+		consumer:           cons,
+		fileVersionService: fvs,
+	}
+	for _, opt := range opts {
+		opt(w)
+	}
+	return w
+}
+
+func WithThumbSize(width int, height int) func(*PreviewWorker) {
+	return func(p *PreviewWorker) {
+		p.thumbWidth = width
+		p.thumbHeight = height
+	}
+}
+
+func WithFormat(format imaging.Format) func(*PreviewWorker) {
+	return func(p *PreviewWorker) {
+		p.format = format
+	}
+}
+
+func WithRetryDelay(retryDelay time.Duration) func(*PreviewWorker) {
+	return func(p *PreviewWorker) {
+		p.retryDelay = retryDelay
+	}
 }
 
 func (w *PreviewWorker) Handle(ctx context.Context, versionID uuid.UUID) error {
 	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
 		versionID, err := w.consumer.Consume(ctx)
 		if err != nil {
-			return err
-		}
-
-		version, err := w.fileVersionService.GetVersionByID(versionID)
-		if err != nil {
-			return err
-		}
-
-		if isImageFile(version.S3Key.String()) {
-			previewKey, err := file_version.NewS3Key(addPreviewSuffix(version.S3Key.String()))
-			if err != nil {
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 				return err
 			}
-			err = w.generateAndUploadImagePreview(ctx, version.S3Key.String(), previewKey.String())
-			if err != nil {
-				return err
-			}
-
-			err = w.fileVersionService.UpdatePreview(versionID, previewKey)
-			if err != nil {
-				return err
-			}
-
+			time.Sleep(w.retryDelay)
 			continue
 		}
 
-		previewKey, err := file_version.NewS3Key(addPreviewSuffix("default_preview.svg"))
-		if err != nil {
-			return err
-		}
-		err = w.fileVersionService.UpdatePreview(versionID, previewKey)
-		if err != nil {
-			return err
+		if err := w.ProcessVersion(ctx, versionID); err != nil {
+			time.Sleep(w.retryDelay)
+			continue
 		}
 
 	}
 }
+func (w *PreviewWorker) ProcessVersion(ctx context.Context, versionID uuid.UUID) error {
+	version, err := w.fileVersionService.GetVersionByID(versionID)
+	if err != nil {
+		return err
+	}
+	if version == nil {
+		return errors.New("version is nil")
+	}
 
+	origKey := version.S3Key.String()
+
+	var previewKey *file_version.S3Key
+	if isImageFile(origKey) {
+		genKey, err := file_version.NewS3Key(addPreviewSuffix(origKey))
+		if err != nil {
+			return err
+		}
+		if err := w.generateAndUploadImagePreview(ctx, origKey, genKey.String()); err != nil {
+			return err
+		}
+		previewKey = &genKey
+	} else {
+		// Консистентный ключ для заглушки превью
+		genKey, err := file_version.NewS3Key(addPreviewSuffix("default_preview.svg"))
+		if err != nil {
+			return err
+		}
+		previewKey = &genKey
+	}
+
+	return w.fileVersionService.UpdatePreview(versionID, *previewKey)
+}
 func (w *PreviewWorker) generateAndUploadImagePreview(ctx context.Context, fileKey, previewKey string) error {
 	imgData, err := w.storage.DownloadFile(ctx, fileKey)
 	if err != nil {
