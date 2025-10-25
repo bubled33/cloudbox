@@ -1,4 +1,4 @@
-package app
+package auth_service
 
 import (
 	"context"
@@ -6,17 +6,19 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	magic_link_service "github.com/yourusername/cloud-file-storage/internal/app/magic_link"
+	session_service "github.com/yourusername/cloud-file-storage/internal/app/session"
 	"github.com/yourusername/cloud-file-storage/internal/domain/magic_link"
 	"github.com/yourusername/cloud-file-storage/internal/domain/session"
 )
 
 type AuthService struct {
-	magicLinkService *MagicLinkService
-	sessionService   *SessionService
+	magicLinkService *magic_link_service.MagicLinkService
+	sessionService   *session_service.SessionService
 	sessionTTL       time.Duration
 }
 
-func NewAuthService(mlService *MagicLinkService, sService *SessionService, sessionTTL time.Duration) *AuthService {
+func NewAuthService(mlService *magic_link_service.MagicLinkService, sService *session_service.SessionService, sessionTTL time.Duration) *AuthService {
 	return &AuthService{
 		magicLinkService: mlService,
 		sessionService:   sService,
@@ -35,7 +37,8 @@ func (a *AuthService) Authenticate(tokenHash string, ip net.IP) (*session.Sessio
 		return nil, magic_link.ErrMagicLink
 	}
 
-	if link.IsUsed || link.IsExpired {
+	// Используем метод IsValid() вместо проверки отдельных флагов
+	if !link.IsValid() {
 		return nil, magic_link.ErrMagicLink
 	}
 

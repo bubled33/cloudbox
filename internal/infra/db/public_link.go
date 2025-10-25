@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/yourusername/cloud-file-storage/internal/domain/domainerrors"
@@ -19,19 +20,18 @@ func (r *PublicLinkCommandRepository) Save(ctx context.Context, p public_link.Pu
 	}
 
 	query := `
-	INSERT INTO files (id, file_id, created_by_user_id, token_hash, is_expired,
-		       created_at, updated_at, expired_at)
-	VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-	ON CONFLICT (id) DO UPDATE 
-	SET file_id = $2, created_by_user_id = $3, token_hash = $4, is_expired = $5, created_at = $6, updated_at = $7,
-		       expired_at = $8
-	`
+    INSERT INTO public_links (id, file_id, created_by_user_id, token_hash,
+               created_at, updated_at, expired_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7)
+    ON CONFLICT (id) DO UPDATE 
+    SET file_id = $2, created_by_user_id = $3, token_hash = $4, 
+        created_at = $5, updated_at = $6, expired_at = $7
+    `
 	_, err := tx.ExecContext(ctx, query,
 		p.ID,
 		p.FileID,
 		p.CreatedByUserID,
 		p.TokenHash,
-		p.IsExpired,
 		p.CreatedAt,
 		p.UpdatedAt,
 		p.ExpiredAt,
@@ -61,15 +61,13 @@ func NewPublicLinkQueryRepository(db *sql.DB) *PublicLinkQueryRepository {
 func scanPublicLink(scanner scannable) (*public_link.PublicLink, error) {
 	var p public_link.PublicLink
 	var tokenHash string
-	var isExpired bool
-	var expiredAt sql.NullTime // может быть NULL в базе
+	var expiredAt time.Time
 
 	if err := scanner.Scan(
 		&p.ID,
 		&p.FileID,
 		&p.CreatedByUserID,
 		&tokenHash,
-		&isExpired,
 		&p.CreatedAt,
 		&p.UpdatedAt,
 		&expiredAt,
@@ -78,21 +76,18 @@ func scanPublicLink(scanner scannable) (*public_link.PublicLink, error) {
 	}
 
 	p.TokenHash = tokenHash
-	p.IsExpired = isExpired
-	if expiredAt.Valid {
-		p.ExpiredAt = expiredAt.Time
-	}
+	p.ExpiredAt = expiredAt
 
 	return &p, nil
 }
 
 func (r *PublicLinkQueryRepository) GetByID(ctx context.Context, id uuid.UUID) (*public_link.PublicLink, error) {
 	row := r.db.QueryRowContext(ctx, `
-		SELECT id, file_id, created_by_user_id, token_hash, is_expired,
-		       created_at, updated_at, expired_at
-		FROM public_links
-		WHERE id = $1
-	`, id)
+        SELECT id, file_id, created_by_user_id, token_hash,
+               created_at, updated_at, expired_at
+        FROM public_links
+        WHERE id = $1
+    `, id)
 
 	p, err := scanPublicLink(row)
 	if err == sql.ErrNoRows {
@@ -103,11 +98,11 @@ func (r *PublicLinkQueryRepository) GetByID(ctx context.Context, id uuid.UUID) (
 
 func (r *PublicLinkQueryRepository) GetByFileID(ctx context.Context, fileID uuid.UUID) ([]*public_link.PublicLink, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT id, file_id, created_by_user_id, token_hash, is_expired,
-		       created_at, updated_at, expired_at
-		FROM public_links
-		WHERE file_id = $1
-	`, fileID)
+        SELECT id, file_id, created_by_user_id, token_hash,
+               created_at, updated_at, expired_at
+        FROM public_links
+        WHERE file_id = $1
+    `, fileID)
 	if err != nil {
 		return nil, err
 	}
@@ -131,10 +126,10 @@ func (r *PublicLinkQueryRepository) GetByFileID(ctx context.Context, fileID uuid
 
 func (r *PublicLinkQueryRepository) GetAll(ctx context.Context) ([]*public_link.PublicLink, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT id, file_id, created_by_user_id, token_hash, is_expired,
-		       created_at, updated_at, expired_at
-		FROM public_links
-	`)
+        SELECT id, file_id, created_by_user_id, token_hash,
+               created_at, updated_at, expired_at
+        FROM public_links
+    `)
 	if err != nil {
 		return nil, err
 	}

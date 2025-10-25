@@ -17,8 +17,7 @@ type MagicLink struct {
 
 	Ip value_objects.IP
 
-	IsUsed    bool
-	IsExpired bool
+	IsUsed bool
 
 	UsedAt    *time.Time
 	CreatedAt time.Time
@@ -50,7 +49,6 @@ func NewMagicLink(
 	}
 }
 
-// MarkAsUsed помечает магическую ссылку как использованную
 func (m *MagicLink) MarkAsUsed() {
 	now := time.Now()
 	m.IsUsed = true
@@ -58,15 +56,10 @@ func (m *MagicLink) MarkAsUsed() {
 	m.UpdatedAt = now
 }
 
-func (m *MagicLink) MarkAsExpired() error {
-	now := time.Now()
-	expiredAt, err := value_objects.NewExpiresAt(now)
-	if err != nil {
-		return err
-	}
+func (m *MagicLink) IsExpired() bool {
+	return time.Now().After(m.ExpiredAt.Time())
+}
 
-	m.IsExpired = true
-	m.ExpiredAt = expiredAt
-	m.UpdatedAt = now
-	return nil
+func (m *MagicLink) IsValid() bool {
+	return !m.IsUsed && !m.IsExpired()
 }

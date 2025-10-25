@@ -1,4 +1,4 @@
-package app
+package public_link_service
 
 import (
 	"context"
@@ -6,34 +6,28 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	event_service "github.com/yourusername/cloud-file-storage/internal/app/event"
 	"github.com/yourusername/cloud-file-storage/internal/domain/public_link"
-	"github.com/yourusername/cloud-file-storage/internal/domain/queue"
 	"github.com/yourusername/cloud-file-storage/internal/domain/value_objects"
 )
 
 const defaultPublicLinkTTL = 15 * time.Minute
 
 type PublicLinkService struct {
-	queryRepo       public_link.PublicLinkQueryRepository
-	commandRepo     public_link.PublicLinkCommandRepository
-	expirerProducer queue.ExpirerProducer
-	expirerConsumer queue.ExpirerConsumer
-	eventService    *EventService
+	queryRepo    public_link.PublicLinkQueryRepository
+	commandRepo  public_link.PublicLinkCommandRepository
+	eventService *event_service.EventService
 }
 
 func NewPublicLinkService(
 	queryRepo public_link.PublicLinkQueryRepository,
 	commandRepo public_link.PublicLinkCommandRepository,
-	expirerProducer queue.ExpirerProducer,
-	expirerConsumer queue.ExpirerConsumer,
-	eventService *EventService,
+	eventService *event_service.EventService,
 ) *PublicLinkService {
 	return &PublicLinkService{
-		queryRepo:       queryRepo,
-		commandRepo:     commandRepo,
-		expirerConsumer: expirerConsumer,
-		expirerProducer: expirerProducer,
-		eventService:    eventService,
+		queryRepo:    queryRepo,
+		commandRepo:  commandRepo,
+		eventService: eventService,
 	}
 }
 
@@ -59,14 +53,15 @@ func (s *PublicLinkService) Create(
 		return nil, err
 	}
 
-	link := public_link.NewPublicLink(fileID, createdByUserID, tokenHash.String(), expiresAtVO.Time())
+	// ИСПРАВЛЕНО: передаем TokenHash и ExpiresAt правильно
+	link := public_link.NewPublicLink(
+		fileID,
+		createdByUserID,
+		tokenHash.String(),
+		expiresAtVO.Time(),
+	)
 
 	if err := s.commandRepo.Save(link); err != nil {
-		return nil, err
-	}
-
-	ttl := time.Until(expiresAtVO.Time())
-	if err := s.expirerProducer.Produce(ctx, link.ID, ttl); err != nil {
 		return nil, err
 	}
 
@@ -91,35 +86,8 @@ func (s *PublicLinkService) Delete(ctx context.Context, id uuid.UUID) error {
 		return err
 	}
 
-	_ = s.expirerConsumer.Remove(ctx, id)
-
 	if s.eventService != nil {
 		eventName, payload := public_link.NewPublicLinkDeletedEvent(id)
-		_, _ = s.eventService.Create(eventName, payload)
-	}
-
-	return nil
-}
-
-func (s *PublicLinkService) Expire(id uuid.UUID) error {
-	link, err := s.queryRepo.GetByID(id)
-	if err != nil {
-		return err
-	}
-	if link == nil {
-		return public_link.ErrNotFound
-	}
-	if link.IsExpired {
-		return nil
-	}
-
-	link.MarkAsExpired()
-	if err := s.commandRepo.Save(link); err != nil {
-		return err
-	}
-
-	if s.eventService != nil {
-		eventName, payload := public_link.NewPublicLinkExpiredEvent(id)
 		_, _ = s.eventService.Create(eventName, payload)
 	}
 
@@ -134,7 +102,7 @@ func (s *PublicLinkService) GetByID(id uuid.UUID) (*public_link.PublicLink, erro
 	if link == nil {
 		return nil, public_link.ErrNotFound
 	}
-	if link.IsExpired {
+	if link.IsExpired() {
 		return nil, errors.New("link has expired")
 	}
 	return link, nil

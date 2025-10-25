@@ -36,19 +36,17 @@ func TestPublicLinkCommandRepository_Save_Success(t *testing.T) {
 		FileID:          fileID,
 		CreatedByUserID: userID,
 		TokenHash:       "token123",
-		IsExpired:       false,
 		CreatedAt:       now,
 		UpdatedAt:       now,
 		ExpiredAt:       expiredAt,
 	}
 
-	mock.ExpectExec(`INSERT INTO files`).
+	mock.ExpectExec(`INSERT INTO public_links`).
 		WithArgs(
 			p.ID,
 			p.FileID,
 			p.CreatedByUserID,
 			p.TokenHash,
-			p.IsExpired,
 			p.CreatedAt,
 			p.UpdatedAt,
 			p.ExpiredAt,
@@ -113,12 +111,12 @@ func TestPublicLinkQueryRepository_GetByID_Success(t *testing.T) {
 	now := time.Now()
 	expiredAt := now.Add(time.Hour)
 
-	mock.ExpectQuery(`SELECT id, file_id, created_by_user_id, token_hash, is_expired,`).
+	mock.ExpectQuery(`SELECT id, file_id, created_by_user_id, token_hash,`).
 		WithArgs(id).
 		WillReturnRows(sqlmock.NewRows([]string{
-			"id", "file_id", "created_by_user_id", "token_hash", "is_expired",
+			"id", "file_id", "created_by_user_id", "token_hash",
 			"created_at", "updated_at", "expired_at",
-		}).AddRow(id, fileID, userID, "token123", false, now, now, expiredAt))
+		}).AddRow(id, fileID, userID, "token123", now, now, expiredAt))
 
 	p, err := repo.GetByID(context.Background(), id)
 	require.NoError(t, err)
@@ -135,7 +133,7 @@ func TestPublicLinkQueryRepository_GetByID_NoRows(t *testing.T) {
 	repo := NewPublicLinkQueryRepository(sqlDB)
 	id := uuid.New()
 
-	mock.ExpectQuery(`SELECT id, file_id, created_by_user_id, token_hash, is_expired,`).
+	mock.ExpectQuery(`SELECT id, file_id, created_by_user_id, token_hash,`).
 		WithArgs(id).
 		WillReturnError(sql.ErrNoRows)
 
@@ -153,13 +151,13 @@ func TestPublicLinkQueryRepository_GetByFileID_Success(t *testing.T) {
 	fileID := uuid.New()
 	now := time.Now()
 
-	mock.ExpectQuery(`SELECT id, file_id, created_by_user_id, token_hash, is_expired,`).
+	mock.ExpectQuery(`SELECT id, file_id, created_by_user_id, token_hash,`).
 		WithArgs(fileID).
 		WillReturnRows(sqlmock.NewRows([]string{
-			"id", "file_id", "created_by_user_id", "token_hash", "is_expired",
+			"id", "file_id", "created_by_user_id", "token_hash",
 			"created_at", "updated_at", "expired_at",
-		}).AddRow(uuid.New(), fileID, uuid.New(), "token1", false, now, now, now.Add(time.Hour)).
-			AddRow(uuid.New(), fileID, uuid.New(), "token2", true, now, now, now.Add(time.Hour)))
+		}).AddRow(uuid.New(), fileID, uuid.New(), "token1", now, now, now.Add(time.Hour)).
+			AddRow(uuid.New(), fileID, uuid.New(), "token2", now, now, now.Add(2*time.Hour)))
 
 	links, err := repo.GetByFileID(context.Background(), fileID)
 	require.NoError(t, err)
@@ -176,12 +174,12 @@ func TestPublicLinkQueryRepository_GetAll_Success(t *testing.T) {
 	repo := NewPublicLinkQueryRepository(sqlDB)
 	now := time.Now()
 
-	mock.ExpectQuery(`SELECT id, file_id, created_by_user_id, token_hash, is_expired,`).
+	mock.ExpectQuery(`SELECT id, file_id, created_by_user_id, token_hash,`).
 		WillReturnRows(sqlmock.NewRows([]string{
-			"id", "file_id", "created_by_user_id", "token_hash", "is_expired",
+			"id", "file_id", "created_by_user_id", "token_hash",
 			"created_at", "updated_at", "expired_at",
-		}).AddRow(uuid.New(), uuid.New(), uuid.New(), "token1", false, now, now, now.Add(time.Hour)).
-			AddRow(uuid.New(), uuid.New(), uuid.New(), "token2", true, now, now, now.Add(time.Hour)))
+		}).AddRow(uuid.New(), uuid.New(), uuid.New(), "token1", now, now, now.Add(time.Hour)).
+			AddRow(uuid.New(), uuid.New(), uuid.New(), "token2", now, now, now.Add(2*time.Hour)))
 
 	links, err := repo.GetAll(context.Background())
 	require.NoError(t, err)

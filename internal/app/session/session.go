@@ -1,10 +1,11 @@
-package app
+package session_service
 
 import (
 	"net"
 	"time"
 
 	"github.com/google/uuid"
+	event_service "github.com/yourusername/cloud-file-storage/internal/app/event"
 	"github.com/yourusername/cloud-file-storage/internal/domain/session"
 	"github.com/yourusername/cloud-file-storage/internal/domain/value_objects"
 )
@@ -12,13 +13,13 @@ import (
 type SessionService struct {
 	queryRepo    session.QueryRepository
 	commandRepo  session.CommandRepository
-	eventService *EventService
+	eventService *event_service.EventService
 }
 
 func NewSessionService(
 	queryRepo session.QueryRepository,
 	commandRepo session.CommandRepository,
-	eventService *EventService,
+	eventService *event_service.EventService,
 ) *SessionService {
 	return &SessionService{
 		queryRepo:    queryRepo,

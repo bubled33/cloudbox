@@ -2,6 +2,7 @@ package app
 
 import (
 	"github.com/google/uuid"
+	event_service "github.com/yourusername/cloud-file-storage/internal/app/event"
 	"github.com/yourusername/cloud-file-storage/internal/domain/file"
 	"github.com/yourusername/cloud-file-storage/internal/domain/file_version"
 )
@@ -11,7 +12,7 @@ type FileService struct {
 	fileCommandRepo    file.CommandRepository
 	versionQueryRepo   file_version.QueryRepository
 	versionCommandRepo file_version.CommandRepository
-	eventService       *EventService
+	eventService       *event_service.EventService
 }
 
 func NewFileService(
@@ -19,7 +20,7 @@ func NewFileService(
 	fileCommandRepo file.CommandRepository,
 	versionQueryRepo file_version.QueryRepository,
 	versionCommandRepo file_version.CommandRepository,
-	eventService *EventService,
+	eventService *event_service.EventService,
 ) *FileService {
 	return &FileService{
 		fileQueryRepo:      fileQueryRepo,

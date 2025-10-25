@@ -12,7 +12,6 @@ type PublicLink struct {
 	CreatedByUserID uuid.UUID
 
 	TokenHash string
-	IsExpired bool
 
 	CreatedAt time.Time
 	UpdatedAt time.Time
@@ -32,15 +31,12 @@ func NewPublicLink(
 		FileID:          fileID,
 		CreatedByUserID: createdByUserID,
 		TokenHash:       tokenHash,
-		IsExpired:       false,
+		ExpiredAt:       expiresAt, // ИСПРАВЛЕНО: добавлено присваивание
 		CreatedAt:       now,
 		UpdatedAt:       now,
 	}
 }
 
-func (p *PublicLink) MarkAsExpired() {
-	now := time.Now()
-	p.IsExpired = true
-	p.ExpiredAt = now
-	p.UpdatedAt = now
+func (p *PublicLink) IsExpired() bool {
+	return time.Now().After(p.ExpiredAt)
 }

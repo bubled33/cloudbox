@@ -30,13 +30,13 @@ func (r *MagicLinkCommandRepository) Save(ctx context.Context, m magic_link.Magi
 	}
 
 	query := `
-	INSERT INTO magic_links (id, user_id, token_hash, device_info, purpose, ip,
-		       is_used, is_expired, used_at, created_at, updated_at, expired_at)
-	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-	ON CONFLICT (id) DO UPDATE 
-	SET user_id=$2, token_hash=$3, device_info=$4, purpose=$5, ip=$6,
-		       is_used=$7, is_expire=$8, used_a=$9, created_at=$10, updated_at=$11, expired_at=$12
-	`
+    INSERT INTO magic_links (id, user_id, token_hash, device_info, purpose, ip,
+               is_used, used_at, created_at, updated_at, expired_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+    ON CONFLICT (id) DO UPDATE 
+    SET user_id=$2, token_hash=$3, device_info=$4, purpose=$5, ip=$6,
+        is_used=$7, used_at=$8, created_at=$9, updated_at=$10, expired_at=$11
+    `
 	_, err := tx.ExecContext(ctx, query,
 		m.ID,
 		m.UserID,
@@ -45,7 +45,6 @@ func (r *MagicLinkCommandRepository) Save(ctx context.Context, m magic_link.Magi
 		m.Purpose.String(),
 		m.Ip.String(),
 		m.IsUsed,
-		m.IsExpired,
 		m.UsedAt,
 		m.CreatedAt,
 		m.UpdatedAt,
@@ -64,6 +63,7 @@ func (r *MagicLinkCommandRepository) Delete(ctx context.Context, id uuid.UUID) e
 	_, err := tx.ExecContext(ctx, query, id)
 	return err
 }
+
 func scanMagicLink(scanner scannable) (*magic_link.MagicLink, error) {
 	var m magic_link.MagicLink
 	var tokenHashStr, deviceInfoStr, ipStr, purposeStr string
@@ -78,7 +78,6 @@ func scanMagicLink(scanner scannable) (*magic_link.MagicLink, error) {
 		&purposeStr,
 		&ipStr,
 		&m.IsUsed,
-		&m.IsExpired,
 		&usedAt,
 		&m.CreatedAt,
 		&m.UpdatedAt,
@@ -125,11 +124,11 @@ func scanMagicLink(scanner scannable) (*magic_link.MagicLink, error) {
 
 func (r *MagicLinkQueryRepository) GetByID(ctx context.Context, id uuid.UUID) (*magic_link.MagicLink, error) {
 	row := r.db.QueryRowContext(ctx, `
-		SELECT id, user_id, token_hash, device_info, purpose, ip,
-		       is_used, is_expired, used_at, created_at, updated_at, expired_at
-		FROM magic_links
-		WHERE id = $1
-	`, id)
+        SELECT id, user_id, token_hash, device_info, purpose, ip,
+               is_used, used_at, created_at, updated_at, expired_at
+        FROM magic_links
+        WHERE id = $1
+    `, id)
 
 	m, err := scanMagicLink(row)
 	if err == sql.ErrNoRows {
@@ -140,11 +139,11 @@ func (r *MagicLinkQueryRepository) GetByID(ctx context.Context, id uuid.UUID) (*
 
 func (r *MagicLinkQueryRepository) GetByTokenHash(ctx context.Context, token value_objects.TokenHash) (*magic_link.MagicLink, error) {
 	row := r.db.QueryRowContext(ctx, `
-		SELECT id, user_id, token_hash, device_info, purpose, ip,
-		       is_used, is_expired, used_at, created_at, updated_at, expired_at
-		FROM magic_links
-		WHERE token_hash = $1
-	`, token.String())
+        SELECT id, user_id, token_hash, device_info, purpose, ip,
+               is_used, used_at, created_at, updated_at, expired_at
+        FROM magic_links
+        WHERE token_hash = $1
+    `, token.String())
 
 	m, err := scanMagicLink(row)
 	if err == sql.ErrNoRows {
@@ -155,11 +154,11 @@ func (r *MagicLinkQueryRepository) GetByTokenHash(ctx context.Context, token val
 
 func (r *MagicLinkQueryRepository) GetByUserID(ctx context.Context, userID uuid.UUID) ([]*magic_link.MagicLink, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT id, user_id, token_hash, device_info, purpose, ip,
-		       is_used, is_expired, used_at, created_at, updated_at, expired_at
-		FROM magic_links
-		WHERE user_id = $1
-	`, userID)
+        SELECT id, user_id, token_hash, device_info, purpose, ip,
+               is_used, used_at, created_at, updated_at, expired_at
+        FROM magic_links
+        WHERE user_id = $1
+    `, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -183,10 +182,10 @@ func (r *MagicLinkQueryRepository) GetByUserID(ctx context.Context, userID uuid.
 
 func (r *MagicLinkQueryRepository) GetAll(ctx context.Context) ([]*magic_link.MagicLink, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT id, user_id, token_hash, device_info, purpose, ip,
-		       is_used, is_expired, used_at, created_at, updated_at, expired_at
-		FROM magic_links
-	`)
+        SELECT id, user_id, token_hash, device_info, purpose, ip,
+               is_used, used_at, created_at, updated_at, expired_at
+        FROM magic_links
+    `)
 	if err != nil {
 		return nil, err
 	}

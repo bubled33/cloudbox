@@ -1,4 +1,4 @@
-package app
+package magic_link_service
 
 import (
 	"context"
@@ -6,33 +6,28 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	event_service "github.com/yourusername/cloud-file-storage/internal/app/event"
 	"github.com/yourusername/cloud-file-storage/internal/domain/magic_link"
-	"github.com/yourusername/cloud-file-storage/internal/domain/queue"
 	"github.com/yourusername/cloud-file-storage/internal/domain/value_objects"
 )
 
 const magicLinkTTL = 5 * time.Minute
 
 type MagicLinkService struct {
-	queryRepo       magic_link.QueryRepository
-	commandRepo     magic_link.CommandRepository
-	expirerProducer queue.ExpirerProducer
-	expirerConsumer queue.ExpirerConsumer
-	eventService    *EventService
+	queryRepo    magic_link.QueryRepository
+	commandRepo  magic_link.CommandRepository
+	eventService *event_service.EventService
 }
 
 func NewMagicLinkService(
 	queryRepo magic_link.QueryRepository,
 	commandRepo magic_link.CommandRepository,
-	expirerProducer queue.ExpirerProducer,
-	expirerConsumer queue.ExpirerConsumer,
-	eventService *EventService,
+	eventService *event_service.EventService,
 ) *MagicLinkService {
 	return &MagicLinkService{
-		queryRepo:       queryRepo,
-		commandRepo:     commandRepo,
-		expirerProducer: expirerProducer,
-		eventService:    eventService,
+		queryRepo:    queryRepo,
+		commandRepo:  commandRepo,
+		eventService: eventService,
 	}
 }
 
@@ -75,10 +70,6 @@ func (s *MagicLinkService) Create(
 		return nil, err
 	}
 
-	if err := s.expirerProducer.Produce(ctx, link.ID, magicLinkTTL); err != nil {
-		return nil, err
-	}
-
 	if s.eventService != nil {
 		eventName, payload := magic_link.NewMagicLinkCreatedEvent(link)
 		_, _ = s.eventService.Create(eventName, payload)
@@ -110,31 +101,6 @@ func (s *MagicLinkService) MarkAsUsed(id uuid.UUID) error {
 	return nil
 }
 
-func (s *MagicLinkService) Expire(id uuid.UUID) error {
-	link, err := s.queryRepo.GetByID(id)
-	if err != nil {
-		return err
-	}
-	if link == nil {
-		return magic_link.ErrNotFound
-	}
-
-	if err := link.MarkAsExpired(); err != nil {
-		return err
-	}
-
-	if err := s.commandRepo.Save(link); err != nil {
-		return err
-	}
-
-	if s.eventService != nil {
-		eventName, payload := magic_link.NewMagicLinkExpiredEvent(link)
-		_, _ = s.eventService.Create(eventName, payload)
-	}
-
-	return nil
-}
-
 func (s *MagicLinkService) Delete(ctx context.Context, id uuid.UUID) error {
 	link, err := s.queryRepo.GetByID(id)
 	if err != nil {
@@ -147,8 +113,6 @@ func (s *MagicLinkService) Delete(ctx context.Context, id uuid.UUID) error {
 	if err := s.commandRepo.Delete(id); err != nil {
 		return err
 	}
-
-	_ = s.expirerConsumer.Remove(ctx, id)
 
 	if s.eventService != nil {
 		eventName, payload := magic_link.NewMagicLinkDeletedEvent(link)
@@ -186,6 +150,11 @@ func (s *MagicLinkService) GetByTokenHash(tokenHashRaw string) (*magic_link.Magi
 	if link == nil {
 		return nil, magic_link.ErrNotFound
 	}
+
+	if !link.IsValid() {
+		return nil, magic_link.ErrInvalid
+	}
+
 	return link, nil
 }
 
@@ -200,9 +169,9 @@ func (s *MagicLinkService) CleanupExpired(ctx context.Context) error {
 	}
 
 	for _, link := range links {
-		if link.IsExpired {
+		if link.IsExpired() {
 			if err := s.Delete(ctx, link.ID); err != nil {
-				return err
+				continue
 			}
 		}
 	}

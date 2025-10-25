@@ -1,24 +1,26 @@
-package app
+package user_service
 
 import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/yourusername/cloud-file-storage/internal/app"
+	event_service "github.com/yourusername/cloud-file-storage/internal/app/event"
 	"github.com/yourusername/cloud-file-storage/internal/domain/user"
 )
 
 type UserService struct {
 	queryRepo    user.QueryRepository
 	commandRepo  user.CommandRepository
-	eventService EventService
-	uow          UnitOfWork
+	eventService event_service.EventService
+	uow          app.UnitOfWork
 }
 
 func NewUserService(
 	queryRepo user.QueryRepository,
 	commandRepo user.CommandRepository,
-	eventService EventService,
-	uow UnitOfWork,
+	eventService event_service.EventService,
+	uow app.UnitOfWork,
 ) *UserService {
 	return &UserService{
 		queryRepo:    queryRepo,

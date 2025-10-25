@@ -67,7 +67,6 @@ func TestMagicLinkCommandRepository_Save_Success(t *testing.T) {
 		Ip:         mustIP("127.0.0.1"),
 		Purpose:    mustPurpose("login"),
 		IsUsed:     true,
-		IsExpired:  false,
 		UsedAt:     &usedAt,
 		CreatedAt:  now,
 		UpdatedAt:  now,
@@ -83,7 +82,6 @@ func TestMagicLinkCommandRepository_Save_Success(t *testing.T) {
 			m.Purpose.String(),
 			m.Ip.String(),
 			m.IsUsed,
-			m.IsExpired,
 			m.UsedAt,
 			m.CreatedAt,
 			m.UpdatedAt,
@@ -151,8 +149,8 @@ func TestMagicLinkQueryRepository_GetByID_Success(t *testing.T) {
 		WithArgs(id).
 		WillReturnRows(sqlmock.NewRows([]string{
 			"id", "user_id", "token_hash", "device_info", "purpose", "ip",
-			"is_used", "is_expired", "used_at", "created_at", "updated_at", "expired_at",
-		}).AddRow(id, userID, "token123", "iPhone", "login", "127.0.0.1", true, false, now, now, now, now.Add(time.Hour)))
+			"is_used", "used_at", "created_at", "updated_at", "expired_at",
+		}).AddRow(id, userID, "token123", "iPhone", "login", "127.0.0.1", true, now, now, now, now.Add(time.Hour)))
 
 	m, err := repo.GetByID(context.Background(), id)
 	require.NoError(t, err)
@@ -192,9 +190,9 @@ func TestMagicLinkQueryRepository_GetAll_Success(t *testing.T) {
 	mock.ExpectQuery(`SELECT id, user_id, token_hash, device_info, purpose, ip,`).
 		WillReturnRows(sqlmock.NewRows([]string{
 			"id", "user_id", "token_hash", "device_info", "purpose", "ip",
-			"is_used", "is_expired", "used_at", "created_at", "updated_at", "expired_at",
-		}).AddRow(uuid.New(), userID, "token1", "iPhone", "login", "127.0.0.1", true, false, now, now, now, now.Add(time.Hour)).
-			AddRow(uuid.New(), userID, "token2", "Android", "login", "127.0.0.2", false, false, nil, now, now, now.Add(time.Hour)))
+			"is_used", "used_at", "created_at", "updated_at", "expired_at",
+		}).AddRow(uuid.New(), userID, "token1", "iPhone", "login", "127.0.0.1", true, now, now, now, now.Add(time.Hour)).
+			AddRow(uuid.New(), userID, "token2", "Android", "login", "127.0.0.2", false, nil, now, now, now.Add(time.Hour)))
 
 	links, err := repo.GetAll(context.Background())
 	require.NoError(t, err)
