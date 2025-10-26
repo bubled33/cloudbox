@@ -9,6 +9,7 @@ import (
 func main() {
 
 	server := api.NewServer()
+
 	err := server.Run(":8080")
 	if err != nil {
 		log.Panicf("Server has error!")

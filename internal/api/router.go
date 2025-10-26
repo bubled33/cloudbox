@@ -1,25 +1,33 @@
 package api
 
-import "github.com/gin-gonic/gin"
+import (
+	"github.com/gin-gonic/gin"
+	"github.com/yourusername/cloud-file-storage/internal/api/handlers"
+)
 
 type Server struct {
-	router *gin.Engine
+	router      *gin.Engine
+	authHandler *handlers.AuthHandler
 }
 
-func NewServer() *Server {
-	router := gin.New()
+func NewServer(authHandler *handlers.AuthHandler) *Server {
+	router := gin.Default()
 
 	s := &Server{
-		router: router,
+		router:      router,
+		authHandler: authHandler,
 	}
 	s.setupRoutes()
 	return s
 }
 
 func (s *Server) setupRoutes() {
-	s.router.GET("/health", func(ctx *gin.Context) {
-		ctx.JSON(200, gin.H{"status": "ok"})
-	})
+	v1 := s.router.Group("/api/v1")
+
+	{
+		auth := v1.Group("/auth")
+		auth.POST("/request-magic-link", s.authHandler.RequestMagicLink)
+	}
 }
 
 func (s *Server) Run(addr string) error {
