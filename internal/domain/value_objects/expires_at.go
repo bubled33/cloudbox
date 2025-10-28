@@ -1,6 +1,7 @@
 package value_objects
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/yourusername/cloud-file-storage/internal/domain/domainerrors"
@@ -11,16 +12,27 @@ type ExpiresAt struct {
 }
 
 func NewExpiresAt(t time.Time) (ExpiresAt, error) {
-	if time.Until(t) <= 0 {
+	if t.IsZero() {
 		return ExpiresAt{}, domainerrors.ErrInvalidExpiry
 	}
+
+	// Валидация на прошлое время временно отключена для отладки
+	// if time.Until(t) <= 0 {
+	//     return ExpiresAt{}, domainerrors.ErrInvalidExpiry
+	// }
+
 	return ExpiresAt{value: t}, nil
 }
 
 func (e ExpiresAt) Time() time.Time {
+	fmt.Println("Test time", e.value)
 	return e.value
 }
 
 func (e ExpiresAt) IsExpired() bool {
 	return time.Now().After(e.value)
+}
+
+func (e ExpiresAt) String() string {
+	return e.value.Format(time.RFC3339)
 }

@@ -1,14 +1,20 @@
 package session
 
-import uuid "github.com/google/uuid"
+import (
+	"context"
+
+	uuid "github.com/google/uuid"
+	"github.com/yourusername/cloud-file-storage/internal/domain/value_objects"
+)
 
 type QueryRepository interface {
-	GetByID(id uuid.UUID) (*Session, error)
-	GetByUserID(userID uuid.UUID) ([]*Session, error)
-	GetAll() ([]*Session, error)
+	GetByID(ctx context.Context, id uuid.UUID) (*Session, error)
+	GetByUserID(ctx context.Context, userID uuid.UUID) ([]*Session, error)
+	GetAll(ctx context.Context) ([]*Session, error)
+	GetByAccessToken(ctx context.Context, tokenHash *value_objects.TokenHash) (*Session, error)
 }
 
 type CommandRepository interface {
-	Save(session *Session) error
-	Delete(id uuid.UUID) error
+	Save(ctx context.Context, session *Session) error
+	Delete(ctx context.Context, id uuid.UUID) error
 }

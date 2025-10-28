@@ -1,14 +1,18 @@
 package file_version
 
-import uuid "github.com/google/uuid"
+import (
+	"context"
+
+	uuid "github.com/google/uuid"
+)
 
 type QueryRepository interface {
-	GetByID(id uuid.UUID) (*FileVersion, error)
-	GetByFileID(fileID uuid.UUID) ([]*FileVersion, error)
-	GetAll() ([]*FileVersion, error)
+	GetByID(ctx context.Context, id uuid.UUID) (*FileVersion, error)
+	GetByFileID(ctx context.Context, fileID uuid.UUID) ([]*FileVersion, error)
+	GetAll(ctx context.Context) ([]*FileVersion, error)
 }
 
 type CommandRepository interface {
-	Save(version *FileVersion) error
-	Delete(id uuid.UUID) error
+	Save(ctx context.Context, version *FileVersion) error
+	Delete(ctx context.Context, id uuid.UUID) error
 }

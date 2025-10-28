@@ -61,20 +61,20 @@ func (s *PublicLinkService) Create(
 		expiresAtVO.Time(),
 	)
 
-	if err := s.commandRepo.Save(link); err != nil {
+	if err := s.commandRepo.Save(ctx, link); err != nil {
 		return nil, err
 	}
 
 	if s.eventService != nil {
 		eventName, payload := public_link.NewPublicLinkCreatedEvent(link)
-		_, _ = s.eventService.Create(eventName, payload)
+		_, _ = s.eventService.Create(ctx, eventName, payload)
 	}
 
 	return link, nil
 }
 
 func (s *PublicLinkService) Delete(ctx context.Context, id uuid.UUID) error {
-	link, err := s.queryRepo.GetByID(id)
+	link, err := s.queryRepo.GetByID(ctx, id)
 	if err != nil {
 		return err
 	}
@@ -82,20 +82,20 @@ func (s *PublicLinkService) Delete(ctx context.Context, id uuid.UUID) error {
 		return public_link.ErrNotFound
 	}
 
-	if err := s.commandRepo.Delete(id); err != nil {
+	if err := s.commandRepo.Delete(ctx, id); err != nil {
 		return err
 	}
 
 	if s.eventService != nil {
 		eventName, payload := public_link.NewPublicLinkDeletedEvent(id)
-		_, _ = s.eventService.Create(eventName, payload)
+		_, _ = s.eventService.Create(ctx, eventName, payload)
 	}
 
 	return nil
 }
 
-func (s *PublicLinkService) GetByID(id uuid.UUID) (*public_link.PublicLink, error) {
-	link, err := s.queryRepo.GetByID(id)
+func (s *PublicLinkService) GetByID(ctx context.Context, id uuid.UUID) (*public_link.PublicLink, error) {
+	link, err := s.queryRepo.GetByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -108,6 +108,6 @@ func (s *PublicLinkService) GetByID(id uuid.UUID) (*public_link.PublicLink, erro
 	return link, nil
 }
 
-func (s *PublicLinkService) GetAll() ([]*public_link.PublicLink, error) {
-	return s.queryRepo.GetAll()
+func (s *PublicLinkService) GetAll(ctx context.Context) ([]*public_link.PublicLink, error) {
+	return s.queryRepo.GetAll(ctx)
 }

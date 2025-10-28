@@ -1,6 +1,8 @@
 package app
 
 import (
+	"context"
+
 	"github.com/google/uuid"
 	event_service "github.com/yourusername/cloud-file-storage/internal/app/event"
 	"github.com/yourusername/cloud-file-storage/internal/domain/file"
@@ -31,8 +33,8 @@ func NewFileService(
 	}
 }
 
-func (s *FileService) GetByID(fileID uuid.UUID) (*file.File, error) {
-	f, err := s.fileQueryRepo.GetByID(fileID)
+func (s *FileService) GetByID(ctx context.Context, fileID uuid.UUID) (*file.File, error) {
+	f, err := s.fileQueryRepo.GetByID(ctx, fileID)
 	if err != nil {
 		return nil, err
 	}
@@ -42,16 +44,16 @@ func (s *FileService) GetByID(fileID uuid.UUID) (*file.File, error) {
 	return f, nil
 }
 
-func (s *FileService) GetAllByUser(userID uuid.UUID) ([]*file.File, error) {
-	return s.fileQueryRepo.GetByUserID(userID)
+func (s *FileService) GetAllByUser(ctx context.Context, userID uuid.UUID) ([]*file.File, error) {
+	return s.fileQueryRepo.GetByUserID(ctx, userID)
 }
 
-func (s *FileService) GetAll() ([]*file.File, error) {
-	return s.fileQueryRepo.GetAll()
+func (s *FileService) GetAll(ctx context.Context) ([]*file.File, error) {
+	return s.fileQueryRepo.GetAll(ctx)
 }
 
-func (s *FileService) RenameFile(fileID uuid.UUID, newName string) error {
-	f, err := s.fileQueryRepo.GetByID(fileID)
+func (s *FileService) RenameFile(ctx context.Context, fileID uuid.UUID, newName string) error {
+	f, err := s.fileQueryRepo.GetByID(ctx, fileID)
 	if err != nil {
 		return err
 	}
@@ -66,25 +68,25 @@ func (s *FileService) RenameFile(fileID uuid.UUID, newName string) error {
 
 	f.Rename(nameVO)
 
-	if err := s.fileCommandRepo.Save(f); err != nil {
+	if err := s.fileCommandRepo.Save(ctx, f); err != nil {
 		return err
 	}
 
 	if s.eventService != nil {
 		eventName, payload := file.NewFileRenamedEvent(f)
-		_, _ = s.eventService.Create(eventName, payload)
+		_, _ = s.eventService.Create(ctx, eventName, payload)
 	}
 
 	return nil
 }
 
-func (s *FileService) Delete(fileID uuid.UUID) error {
-	f, err := s.fileQueryRepo.GetByID(fileID)
+func (s *FileService) Delete(ctx context.Context, fileID uuid.UUID) error {
+	f, err := s.fileQueryRepo.GetByID(ctx, fileID)
 	if err != nil || f == nil {
 		return file.ErrNotFound
 	}
 
-	versions, err := s.versionQueryRepo.GetByFileID(fileID)
+	versions, err := s.versionQueryRepo.GetByFileID(ctx, fileID)
 	if err != nil {
 		return err
 	}
@@ -96,18 +98,18 @@ func (s *FileService) Delete(fileID uuid.UUID) error {
 	}
 
 	for _, v := range versions {
-		if err := s.versionCommandRepo.Delete(v.ID); err != nil {
+		if err := s.versionCommandRepo.Delete(ctx, v.ID); err != nil {
 			return err
 		}
 	}
 
-	if err := s.fileCommandRepo.Delete(fileID); err != nil {
+	if err := s.fileCommandRepo.Delete(ctx, fileID); err != nil {
 		return err
 	}
 
 	if s.eventService != nil {
 		eventName, payload := file.NewFileDeletedEvent(f)
-		_, _ = s.eventService.Create(eventName, payload)
+		_, _ = s.eventService.Create(ctx, eventName, payload)
 	}
 
 	return nil

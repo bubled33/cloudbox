@@ -23,7 +23,10 @@ func NewMagicLinkQueryRepository(db *sql.DB) *MagicLinkQueryRepository {
 	return &MagicLinkQueryRepository{db: db}
 }
 
-func (r *MagicLinkCommandRepository) Save(ctx context.Context, m magic_link.MagicLink) error {
+func NewMagicLinkCommandRepository() *MagicLinkCommandRepository {
+	return &MagicLinkCommandRepository{}
+}
+func (r *MagicLinkCommandRepository) Save(ctx context.Context, m *magic_link.MagicLink) error {
 	tx, ok := ctx.Value("tx").(*sql.Tx)
 	if !ok {
 		return domainerrors.ErrTransactionNotFound

@@ -12,14 +12,14 @@ import (
 type UserService struct {
 	queryRepo    user.QueryRepository
 	commandRepo  user.CommandRepository
-	eventService event_service.EventService
+	eventService *event_service.EventService
 	uow          app.UnitOfWork
 }
 
 func NewUserService(
 	queryRepo user.QueryRepository,
 	commandRepo user.CommandRepository,
-	eventService event_service.EventService,
+	eventService *event_service.EventService,
 	uow app.UnitOfWork,
 ) *UserService {
 	return &UserService{
@@ -58,7 +58,7 @@ func (s *UserService) Create(ctx context.Context, rawEmail, rawDisplayName strin
 	}
 
 	eventType, payload := user.NewUserCreatedEvent(createdUser)
-	_, _ = s.eventService.Create(eventType, payload)
+	_, _ = s.eventService.Create(ctx, eventType, payload)
 
 	return createdUser, nil
 }
@@ -83,7 +83,7 @@ func (s *UserService) Delete(ctx context.Context, id uuid.UUID) error {
 	}
 
 	eventType, payload := user.NewUserDeletedEvent(id)
-	_, _ = s.eventService.Create(eventType, payload)
+	_, _ = s.eventService.Create(ctx, eventType, payload)
 	return nil
 }
 
@@ -106,7 +106,7 @@ func (s *UserService) VerifyEmail(ctx context.Context, userID uuid.UUID) error {
 	}
 
 	eventType, payload := user.NewUserEmailVerifiedEvent(userID)
-	_, _ = s.eventService.Create(eventType, payload)
+	_, _ = s.eventService.Create(ctx, eventType, payload)
 	return nil
 }
 

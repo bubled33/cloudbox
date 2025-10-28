@@ -1,14 +1,18 @@
 package file
 
-import uuid "github.com/google/uuid"
+import (
+	"context"
+
+	uuid "github.com/google/uuid"
+)
 
 type QueryRepository interface {
-	GetByID(id uuid.UUID) (*File, error)
-	GetByUserID(userID uuid.UUID) ([]*File, error)
-	GetAll() ([]*File, error)
+	GetByID(ctx context.Context, id uuid.UUID) (*File, error)
+	GetByUserID(ctx context.Context, userID uuid.UUID) ([]*File, error)
+	GetAll(ctx context.Context) ([]*File, error)
 }
 
 type CommandRepository interface {
-	Save(file *File) error
-	Delete(id uuid.UUID) error
+	Save(ctx context.Context, file *File) error
+	Delete(ctx context.Context, id uuid.UUID) error
 }

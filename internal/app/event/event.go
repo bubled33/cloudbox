@@ -9,19 +9,27 @@ import (
 )
 
 type EventService struct {
-	repo       event.EventRepository
-	producer   queue.EventProducer
-	instanceID string
+	queryRepo   event.QueryRepository
+	commandRepo event.CommandRepository
+	producer    queue.EventProducer
+	instanceID  string
 }
 
-func NewEventService(repo event.EventRepository, producer queue.EventProducer, instanceID string) *EventService {
+func NewEventService(
+	queryRepo event.QueryRepository,
+	commandRepo event.CommandRepository,
+	producer queue.EventProducer,
+	instanceID string,
+) *EventService {
 	return &EventService{
-		repo:       repo,
-		producer:   producer,
-		instanceID: instanceID,
+		queryRepo:   queryRepo,
+		commandRepo: commandRepo,
+		producer:    producer,
+		instanceID:  instanceID,
 	}
 }
-func (s *EventService) Create(name string, payload any) (*event.Event, error) {
+
+func (s *EventService) Create(ctx context.Context, name string, payload any) (*event.Event, error) {
 	e, err := event.NewEvent(name, payload)
 	if err != nil {
 		return nil, err
@@ -30,7 +38,7 @@ func (s *EventService) Create(name string, payload any) (*event.Event, error) {
 	e.Lock(s.instanceID)
 	defer e.Unlock()
 
-	if err := s.repo.Save(e); err != nil {
+	if err := s.commandRepo.Save(ctx, e); err != nil {
 		return nil, err
 	}
 
@@ -38,7 +46,7 @@ func (s *EventService) Create(name string, payload any) (*event.Event, error) {
 }
 
 func (s *EventService) PublishPending(ctx context.Context, batchSize int, maxRetries int) error {
-	events, err := s.repo.GetPending(batchSize)
+	events, err := s.queryRepo.GetPending(ctx, batchSize)
 	if err != nil {
 		return err
 	}
@@ -52,17 +60,19 @@ func (s *EventService) PublishPending(ctx context.Context, batchSize int, maxRet
 	for _, e := range events {
 		if e.LockedAt == nil {
 			e.Lock(s.instanceID)
-			if err := s.repo.Save(e); err != nil {
+			if err := s.commandRepo.Save(ctx, e); err != nil {
 				failedEvents = append(failedEvents, e)
 				continue
 			}
 		}
 
 		if err := s.producer.Produce(ctx, e); err != nil {
-
 			e.RetryCount++
 			e.Unlock()
-			_ = s.repo.Save(e)
+
+			if err := s.commandRepo.UpdateRetryCount(ctx, e.ID, e.RetryCount); err != nil {
+				// Логируем ошибку, но продолжаем
+			}
 
 			if e.RetryCount >= maxRetries {
 				// TODO: Здесь можно пометить событие как "проваленное" или отправить в dead-letter
@@ -74,7 +84,10 @@ func (s *EventService) PublishPending(ctx context.Context, batchSize int, maxRet
 
 		e.MarkAsSent()
 		e.Unlock()
-		_ = s.repo.Save(e)
+
+		if err := s.commandRepo.MarkAsSent(ctx, e.ID); err != nil {
+			// Логируем ошибку
+		}
 	}
 
 	if len(failedEvents) > 0 {

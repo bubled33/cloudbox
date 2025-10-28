@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	_ "github.com/lib/pq"
+	_ "github.com/lib/pq" // Добавьте эту строку!
 )
 
 // Connect устанавливает соединение с базой данных PostgreSQL

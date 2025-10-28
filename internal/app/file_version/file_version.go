@@ -49,16 +49,16 @@ func generateS3Key(ownerID, fileID uuid.UUID, versionNum int, name string) strin
 	return fmt.Sprintf("files/%s/%s/v%d/%s", ownerID, fileID, versionNum, name)
 }
 
-func (s *FileVersionService) UpdatePreview(versionID uuid.UUID, previewKey file_version.S3Key) error {
-	version, err := s.versionQueryRepo.GetByID(versionID)
+func (s *FileVersionService) UpdatePreview(ctx context.Context, versionID uuid.UUID, previewKey file_version.S3Key) error {
+	version, err := s.versionQueryRepo.GetByID(ctx, versionID)
 	if err != nil {
 		return err
 	}
 	version.MarkReady()
 	version.PreviewS3Key = &previewKey
-	s.versionCommandRepo.Save(version)
+	s.versionCommandRepo.Save(ctx, version)
 
-	file, err := s.GetFileByID(version.FileId)
+	file, err := s.GetFileByID(ctx, version.FileId)
 	if err != nil {
 		return err
 	}
@@ -68,20 +68,21 @@ func (s *FileVersionService) UpdatePreview(versionID uuid.UUID, previewKey file_
 	}
 	file.PreviewS3Key = &previewKey
 	file.MarkReady()
-	s.fileCommandRepo.Save(file)
+	s.fileCommandRepo.Save(ctx, file)
 
 	return nil
 }
-func (s *FileVersionService) GetFileByID(fileID uuid.UUID) (*file.File, error) {
-	return s.fileQueryRepo.GetByID(fileID)
+
+func (s *FileVersionService) GetFileByID(ctx context.Context, fileID uuid.UUID) (*file.File, error) {
+	return s.fileQueryRepo.GetByID(ctx, fileID)
 }
 
-func (s *FileVersionService) GetVersionsByFileID(fileID uuid.UUID) ([]*file_version.FileVersion, error) {
-	return s.versionQueryRepo.GetByFileID(fileID)
+func (s *FileVersionService) GetVersionsByFileID(ctx context.Context, fileID uuid.UUID) ([]*file_version.FileVersion, error) {
+	return s.versionQueryRepo.GetByFileID(ctx, fileID)
 }
 
-func (s *FileVersionService) GetVersionByID(versionID uuid.UUID) (*file_version.FileVersion, error) {
-	version, err := s.versionQueryRepo.GetByID(versionID)
+func (s *FileVersionService) GetVersionByID(ctx context.Context, versionID uuid.UUID) (*file_version.FileVersion, error) {
+	version, err := s.versionQueryRepo.GetByID(ctx, versionID)
 	if err != nil {
 		return nil, err
 	}
@@ -91,8 +92,8 @@ func (s *FileVersionService) GetVersionByID(versionID uuid.UUID) (*file_version.
 	return version, nil
 }
 
-func (s *FileVersionService) GetAllVersions() ([]*file_version.FileVersion, error) {
-	return s.versionQueryRepo.GetAll()
+func (s *FileVersionService) GetAllVersions(ctx context.Context) ([]*file_version.FileVersion, error) {
+	return s.versionQueryRepo.GetAll(ctx)
 }
 
 func (s *FileVersionService) UploadNewFile(ctx context.Context, ownerID, sessionID uuid.UUID, name string, size uint64, mime string) (*file.File, *file_version.FileVersion, string, error) {
@@ -120,10 +121,10 @@ func (s *FileVersionService) UploadNewFile(ctx context.Context, ownerID, session
 
 	version := file_version.NewFileVersion(f.ID, sessionID, s3Key, mimeVO, fileSizeVO, versionNumVO)
 
-	if err := s.fileCommandRepo.Save(f); err != nil {
+	if err := s.fileCommandRepo.Save(ctx, f); err != nil {
 		return nil, nil, "", err
 	}
-	if err := s.versionCommandRepo.Save(version); err != nil {
+	if err := s.versionCommandRepo.Save(ctx, version); err != nil {
 		return nil, nil, "", err
 	}
 
@@ -134,14 +135,14 @@ func (s *FileVersionService) UploadNewFile(ctx context.Context, ownerID, session
 
 	if s.eventService != nil {
 		eventName, payload := file.NewFileVersionUploadedEvent(f.ID, version.ID, ownerID, f.Name.String(), version.VersionNum.Int())
-		_, _ = s.eventService.Create(eventName, payload)
+		_, _ = s.eventService.Create(ctx, eventName, payload)
 	}
 
 	return f, version, uploadURL, nil
 }
 
 func (s *FileVersionService) UploadNewVersion(ctx context.Context, fileID, ownerID, sessionID uuid.UUID, name string, size uint64, mime string, versionNum int) (*file.File, *file_version.FileVersion, string, error) {
-	f, err := s.fileQueryRepo.GetByID(fileID)
+	f, err := s.fileQueryRepo.GetByID(ctx, fileID)
 	if err != nil {
 		return nil, nil, "", err
 	}
@@ -167,10 +168,10 @@ func (s *FileVersionService) UploadNewVersion(ctx context.Context, fileID, owner
 
 	f.UpdateFromVersion(version)
 
-	if err := s.fileCommandRepo.Save(f); err != nil {
+	if err := s.fileCommandRepo.Save(ctx, f); err != nil {
 		return nil, nil, "", err
 	}
-	if err := s.versionCommandRepo.Save(version); err != nil {
+	if err := s.versionCommandRepo.Save(ctx, version); err != nil {
 		return nil, nil, "", err
 	}
 
@@ -181,14 +182,14 @@ func (s *FileVersionService) UploadNewVersion(ctx context.Context, fileID, owner
 
 	if s.eventService != nil {
 		eventName, payload := file.NewFileVersionUploadedEvent(f.ID, version.ID, ownerID, f.Name.String(), f.VersionNum.Int())
-		_, _ = s.eventService.Create(eventName, payload)
+		_, _ = s.eventService.Create(ctx, eventName, payload)
 	}
 
 	return f, version, uploadURL, nil
 }
 
-func (s *FileVersionService) RestoreVersion(fileID, versionID uuid.UUID) error {
-	f, err := s.fileQueryRepo.GetByID(fileID)
+func (s *FileVersionService) RestoreVersion(ctx context.Context, fileID, versionID uuid.UUID) error {
+	f, err := s.fileQueryRepo.GetByID(ctx, fileID)
 	if err != nil {
 		return err
 	}
@@ -196,7 +197,7 @@ func (s *FileVersionService) RestoreVersion(fileID, versionID uuid.UUID) error {
 		return file.ErrNotFound
 	}
 
-	version, err := s.versionQueryRepo.GetByID(versionID)
+	version, err := s.versionQueryRepo.GetByID(ctx, versionID)
 	if err != nil {
 		return err
 	}
@@ -205,25 +206,25 @@ func (s *FileVersionService) RestoreVersion(fileID, versionID uuid.UUID) error {
 	}
 
 	f.UpdateFromVersion(version)
-	if err := s.fileCommandRepo.Save(f); err != nil {
+	if err := s.fileCommandRepo.Save(ctx, f); err != nil {
 		return err
 	}
 
 	if s.eventService != nil {
 		eventName, payload := file.NewFileVersionRestoredEvent(f.ID, version.ID)
-		_, _ = s.eventService.Create(eventName, payload)
+		_, _ = s.eventService.Create(ctx, eventName, payload)
 	}
 
 	return nil
 }
 
 func (s *FileVersionService) DeleteVersion(ctx context.Context, fileID, versionID uuid.UUID) error {
-	f, err := s.fileQueryRepo.GetByID(fileID)
+	f, err := s.fileQueryRepo.GetByID(ctx, fileID)
 	if err != nil || f == nil {
 		return file.ErrNotFound
 	}
 
-	version, err := s.versionQueryRepo.GetByID(versionID)
+	version, err := s.versionQueryRepo.GetByID(ctx, versionID)
 	if err != nil || version == nil {
 		return file_version.ErrVersionNotFound
 	}
@@ -241,13 +242,13 @@ func (s *FileVersionService) DeleteVersion(ctx context.Context, fileID, versionI
 	}
 	_ = s.storage.Delete(ctx, version.S3Key.String())
 
-	if err := s.versionCommandRepo.Delete(versionID); err != nil {
+	if err := s.versionCommandRepo.Delete(ctx, versionID); err != nil {
 		return err
 	}
 
 	if s.eventService != nil {
 		eventName, payload := file.NewFileVersionDeletedEvent(f.ID, version.ID)
-		_, _ = s.eventService.Create(eventName, payload)
+		_, _ = s.eventService.Create(ctx, eventName, payload)
 	}
 
 	return nil

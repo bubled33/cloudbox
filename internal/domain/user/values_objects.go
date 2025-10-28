@@ -1,6 +1,7 @@
 package user
 
 import (
+	"fmt"
 	"net/mail"
 	"strings"
 )
@@ -11,6 +12,7 @@ type Email struct {
 
 func NewEmail(raw string) (Email, error) {
 	addr, err := mail.ParseAddress(strings.TrimSpace(raw))
+	fmt.Println(raw, addr, err)
 	if err != nil {
 		return Email{}, ErrInvalidEmailFormat
 	}
