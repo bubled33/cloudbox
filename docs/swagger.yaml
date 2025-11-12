@@ -1,0 +1,1437 @@
+definitions:
+  auth_handlers.ActiveSessionsResponse:
+    properties:
+      sessions:
+        items:
+          $ref: '#/definitions/auth_handlers.SessionInfo'
+        type: array
+    type: object
+  auth_handlers.LogoutResponse:
+    properties:
+      message:
+        example: successfully logged out
+        type: string
+    type: object
+  auth_handlers.RefreshTokenRequest:
+    properties:
+      refresh_token:
+        type: string
+    required:
+    - refresh_token
+    type: object
+  auth_handlers.RefreshTokenResponse:
+    properties:
+      access_token:
+        example: eyJhbGciOi...
+        type: string
+      expires_at:
+        example: "2025-11-06T12:00:00Z"
+        type: string
+      message:
+        example: tokens refreshed
+        type: string
+      refresh_token:
+        example: eyJhbGciOi...
+        type: string
+    type: object
+  auth_handlers.RequestMagicLinkRequest:
+    properties:
+      display_name:
+        type: string
+      email:
+        type: string
+    type: object
+  auth_handlers.RequestMagicLinkResponse:
+    properties:
+      message:
+        example: magic link sent to email
+        type: string
+    type: object
+  auth_handlers.SessionInfo:
+    properties:
+      created_at:
+        example: "2025-11-05T08:00:00Z"
+        type: string
+      device_info:
+        example: Mozilla/5.0...
+        type: string
+      expires_at:
+        example: "2025-11-12T08:00:00Z"
+        type: string
+      ip:
+        example: 192.168.1.1
+        type: string
+      is_current:
+        example: true
+        type: boolean
+      last_used_at:
+        example: "2025-11-06T10:30:00Z"
+        type: string
+      session_id:
+        example: 123e4567-e89b-12d3-a456-426614174000
+        type: string
+    type: object
+  auth_handlers.VerifyMagicLinkResponse:
+    properties:
+      access_token:
+        example: eyJhbGciOi...
+        type: string
+      expires_at:
+        example: "2025-11-04T12:00:00Z"
+        type: string
+      message:
+        example: successfully authenticated
+        type: string
+      refresh_token:
+        example: eyJhbGciOi...
+        type: string
+      session_id:
+        example: 123e4567-e89b-12d3-a456-426614174000
+        type: string
+    type: object
+  files_handler.DeleteFileResponse:
+    properties:
+      message:
+        example: File deleted successfully
+        type: string
+    type: object
+  files_handler.FileDetailResponse:
+    properties:
+      created_at:
+        example: "2025-11-04T12:00:00Z"
+        type: string
+      current_version:
+        example: 3
+        type: integer
+      id:
+        example: 123e4567-e89b-12d3-a456-426614174000
+        type: string
+      mime:
+        example: application/pdf
+        type: string
+      name:
+        example: document.pdf
+        type: string
+      owner_id:
+        example: 123e4567-e89b-12d3-a456-426614174000
+        type: string
+      preview_s3_key:
+        example: files/user-id/file-id/preview.jpg
+        type: string
+      size:
+        example: 1024000
+        type: integer
+      status:
+        example: ready
+        type: string
+      total_versions:
+        example: 5
+        type: integer
+      updated_at:
+        example: "2025-11-04T12:00:00Z"
+        type: string
+      uploaded_by_session_id:
+        example: 123e4567-e89b-12d3-a456-426614174000
+        type: string
+    type: object
+  files_handler.FileResponse:
+    properties:
+      created_at:
+        example: "2025-11-04T12:00:00Z"
+        type: string
+      id:
+        example: 123e4567-e89b-12d3-a456-426614174000
+        type: string
+      mime:
+        example: application/pdf
+        type: string
+      name:
+        example: document.pdf
+        type: string
+      preview_s3_key:
+        example: files/user-id/file-id/preview.jpg
+        type: string
+      size:
+        example: 1024000
+        type: integer
+      status:
+        example: ready
+        type: string
+      updated_at:
+        example: "2025-11-04T12:00:00Z"
+        type: string
+      version_num:
+        example: 1
+        type: integer
+    type: object
+  files_handler.FileVersionResponse:
+    properties:
+      created_at:
+        example: "2025-11-04T12:00:00Z"
+        type: string
+      file_id:
+        example: 123e4567-e89b-12d3-a456-426614174000
+        type: string
+      id:
+        example: 123e4567-e89b-12d3-a456-426614174001
+        type: string
+      mime:
+        example: application/pdf
+        type: string
+      preview_s3_key:
+        example: files/user-id/file-id/v2/preview.jpg
+        type: string
+      size:
+        example: 2048000
+        type: integer
+      status:
+        example: ready
+        type: string
+      updated_at:
+        example: "2025-11-04T12:30:00Z"
+        type: string
+      version_num:
+        example: 2
+        type: integer
+    type: object
+  files_handler.GetDownloadURLResponse:
+    properties:
+      download_url:
+        example: https://s3.example.com/download?...
+        type: string
+      expires_in:
+        example: 1h
+        type: string
+    type: object
+  files_handler.ListFilesResponse:
+    properties:
+      files:
+        items:
+          $ref: '#/definitions/files_handler.FileResponse'
+        type: array
+      limit:
+        example: 20
+        type: integer
+      skip:
+        example: 0
+        type: integer
+      total:
+        example: 25
+        type: integer
+    type: object
+  files_handler.ListPublicLinksResponse:
+    properties:
+      links:
+        items:
+          $ref: '#/definitions/files_handler.PublicLinkResponse'
+        type: array
+      total:
+        example: 3
+        type: integer
+    type: object
+  files_handler.ListVersionsResponse:
+    properties:
+      total:
+        example: 5
+        type: integer
+      versions:
+        items:
+          $ref: '#/definitions/files_handler.FileVersionResponse'
+        type: array
+    type: object
+  files_handler.PublicDownloadResponse:
+    properties:
+      download_url:
+        example: https://s3.amazonaws.com/...?X-Amz-Signature=...
+        type: string
+      expires_in:
+        example: 1h
+        type: string
+      file_name:
+        example: document.pdf
+        type: string
+      file_size:
+        example: 1024000
+        type: integer
+      mime:
+        example: application/pdf
+        type: string
+    type: object
+  files_handler.PublicLinkInput:
+    properties:
+      expires_in:
+        description: 15m, 1h, 24h, 7d, etc
+        example: 24h
+        type: string
+    required:
+    - expires_in
+    type: object
+  files_handler.PublicLinkResponse:
+    properties:
+      created_at:
+        example: "2025-11-04T12:00:00Z"
+        type: string
+      expires_at:
+        example: "2025-11-05T12:00:00Z"
+        type: string
+      file_id:
+        example: 123e4567-e89b-12d3-a456-426614174000
+        type: string
+      id:
+        example: 123e4567-e89b-12d3-a456-426614174002
+        type: string
+      is_expired:
+        example: false
+        type: boolean
+      token:
+        example: abc123def456
+        type: string
+    type: object
+  files_handler.UpdateFileInput:
+    properties:
+      name:
+        minLength: 1
+        type: string
+    required:
+    - name
+    type: object
+  files_handler.UploadFileInput:
+    properties:
+      mime:
+        type: string
+      name:
+        type: string
+      size:
+        type: integer
+    required:
+    - mime
+    - name
+    - size
+    type: object
+  files_handler.UploadFileResponse:
+    properties:
+      expires_in:
+        example: 15m
+        type: string
+      file_id:
+        example: 123e4567-e89b-12d3-a456-426614174000
+        type: string
+      status:
+        example: processing
+        type: string
+      upload_url:
+        example: https://s3.example.com/upload?...
+        type: string
+      version_id:
+        example: 123e4567-e89b-12d3-a456-426614174001
+        type: string
+      version_num:
+        example: 1
+        type: integer
+    type: object
+  files_handler.UploadNewVersionInput:
+    properties:
+      mime:
+        type: string
+      name:
+        type: string
+      size:
+        type: integer
+    required:
+    - mime
+    - name
+    - size
+    type: object
+  users_handler.DeleteAccountRequest:
+    properties:
+      confirmation:
+        type: string
+    required:
+    - confirmation
+    type: object
+  users_handler.DeleteAccountResponse:
+    properties:
+      message:
+        example: Account successfully deleted
+        type: string
+    type: object
+  users_handler.GetMeResponse:
+    properties:
+      created_at:
+        example: "2025-11-04T12:00:00Z"
+        type: string
+      display_name:
+        example: John Doe
+        type: string
+      email:
+        example: user@example.com
+        type: string
+      id:
+        example: 123e4567-e89b-12d3-a456-426614174000
+        type: string
+      is_email_verified:
+        example: true
+        type: boolean
+    type: object
+  users_handler.UpdateProfileRequest:
+    properties:
+      display_name:
+        maxLength: 255
+        minLength: 1
+        type: string
+      email:
+        type: string
+    required:
+    - display_name
+    - email
+    type: object
+  users_handler.UpdateProfileResponse:
+    properties:
+      display_name:
+        example: John Doe
+        type: string
+      email:
+        example: user@example.com
+        type: string
+      id:
+        example: 123e4567-e89b-12d3-a456-426614174000
+        type: string
+      is_email_verified:
+        example: true
+        type: boolean
+      updated_at:
+        example: "2025-11-04T12:00:00Z"
+        type: string
+    type: object
+info:
+  contact: {}
+paths:
+  /auth/sessions:
+    delete:
+      consumes:
+      - application/json
+      description: Revoke all user sessions across all devices
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: All sessions revoked
+          schema:
+            $ref: '#/definitions/auth_handlers.LogoutResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Logout from all sessions
+      tags:
+      - auth
+    get:
+      consumes:
+      - application/json
+      description: Get list of all active sessions for current user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of active sessions
+          schema:
+            $ref: '#/definitions/auth_handlers.ActiveSessionsResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get active sessions
+      tags:
+      - auth
+  /auth/sessions/{session_id}:
+    delete:
+      consumes:
+      - application/json
+      description: Revoke specific session by ID
+      parameters:
+      - description: Session ID
+        in: path
+        name: session_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Session revoked
+          schema:
+            $ref: '#/definitions/auth_handlers.LogoutResponse'
+        "400":
+          description: Invalid session ID
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Not allowed to revoke this session
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Revoke specific session
+      tags:
+      - auth
+  /auth/sessions/current:
+    delete:
+      consumes:
+      - application/json
+      description: Revoke current session and invalidate tokens
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successfully logged out
+          schema:
+            $ref: '#/definitions/auth_handlers.LogoutResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Logout from current session
+      tags:
+      - auth
+  /files:
+    get:
+      consumes:
+      - application/json
+      description: Get paginated list of files with optional name search
+      parameters:
+      - description: Search query by file name
+        in: query
+        name: q
+        type: string
+      - default: 20
+        description: Results per page
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: Number of results to skip
+        in: query
+        name: skip
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of files
+          schema:
+            $ref: '#/definitions/files_handler.ListFilesResponse'
+        "401":
+          description: User not authenticated
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Failed to list files
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - Bearer: []
+      summary: List user's files
+      tags:
+      - files
+    post:
+      consumes:
+      - application/json
+      description: Create a new file and get presigned URL for uploading file data
+      parameters:
+      - description: File metadata
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/files_handler.UploadFileInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: File created with upload URL
+          schema:
+            $ref: '#/definitions/files_handler.UploadFileResponse'
+        "400":
+          description: Invalid input or file size exceeds limit
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: User not authenticated
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Failed to create file
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - Bearer: []
+      summary: Create new file upload
+      tags:
+      - files
+  /files/{file_id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a file and all its versions
+      parameters:
+      - description: File ID
+        format: uuid
+        in: path
+        name: file_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: File deleted
+          schema:
+            $ref: '#/definitions/files_handler.DeleteFileResponse'
+        "400":
+          description: Invalid file_id format
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: User not authenticated
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Access denied
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: File not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Failed to delete file
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - Bearer: []
+      summary: Delete file
+      tags:
+      - files
+    get:
+      consumes:
+      - application/json
+      description: Get detailed metadata for a specific file including version count
+        and ownership info
+      parameters:
+      - description: File ID
+        format: uuid
+        in: path
+        name: file_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: File detailed metadata
+          schema:
+            $ref: '#/definitions/files_handler.FileDetailResponse'
+        "400":
+          description: Invalid file_id format
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: User not authenticated
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Access denied
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: File not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Failed to get file
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - Bearer: []
+      summary: Get file detailed metadata
+      tags:
+      - files
+    patch:
+      consumes:
+      - application/json
+      description: Update file name and metadata
+      parameters:
+      - description: File ID
+        format: uuid
+        in: path
+        name: file_id
+        required: true
+        type: string
+      - description: Update file data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/files_handler.UpdateFileInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: File updated
+          schema:
+            $ref: '#/definitions/files_handler.FileResponse'
+        "400":
+          description: Invalid input
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: User not authenticated
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Access denied
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: File not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Failed to update file
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - Bearer: []
+      summary: Update file metadata
+      tags:
+      - files
+  /files/{file_id}/public-links:
+    get:
+      consumes:
+      - application/json
+      description: Get list of all public links for a file
+      parameters:
+      - description: File ID
+        format: uuid
+        in: path
+        name: file_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of public links
+          schema:
+            $ref: '#/definitions/files_handler.ListPublicLinksResponse'
+        "400":
+          description: Invalid file_id format
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: User not authenticated
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Access denied
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: File not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Failed to get public links
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - Bearer: []
+      summary: Get public links for file
+      tags:
+      - files
+  /files/{file_id}/public-links/{link_id}:
+    delete:
+      consumes:
+      - application/json
+      description: Revoke access to a public link
+      parameters:
+      - description: File ID
+        format: uuid
+        in: path
+        name: file_id
+        required: true
+        type: string
+      - description: Public Link ID
+        format: uuid
+        in: path
+        name: link_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Link deleted
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Invalid parameters
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: User not authenticated
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Access denied
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: File or link not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Failed to delete public link
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - Bearer: []
+      summary: Delete public link
+      tags:
+      - files
+  /files/{file_id}/versions:
+    get:
+      consumes:
+      - application/json
+      description: Get list of all versions for a file
+      parameters:
+      - description: File ID
+        format: uuid
+        in: path
+        name: file_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of versions
+          schema:
+            $ref: '#/definitions/files_handler.ListVersionsResponse'
+        "400":
+          description: Invalid file_id format
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: User not authenticated
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Access denied
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: File not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Failed to get versions
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - Bearer: []
+      summary: Get file versions
+      tags:
+      - files
+    post:
+      consumes:
+      - application/json
+      description: Create a new version of an existing file and get presigned URL
+        for uploading file data
+      parameters:
+      - description: File ID
+        format: uuid
+        in: path
+        name: file_id
+        required: true
+        type: string
+      - description: New version metadata
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/files_handler.UploadNewVersionInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: New version created with upload URL
+          schema:
+            $ref: '#/definitions/files_handler.UploadFileResponse'
+        "400":
+          description: Invalid input or file size exceeds limit
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: User not authenticated
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Access denied
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: File not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Failed to create new version
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - Bearer: []
+      summary: Upload new version of existing file
+      tags:
+      - files
+  /files/{file_id}/versions/{version_num}/content:
+    get:
+      consumes:
+      - application/json
+      description: Generate presigned URL for downloading specific version of file
+        (expires in 1 hour). If version_num is omitted or 0, uses current file version.
+      parameters:
+      - description: File ID
+        format: uuid
+        in: path
+        name: file_id
+        required: true
+        type: string
+      - default: 0
+        description: Version number (optional, defaults to current version)
+        in: path
+        name: version_num
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Download URL generated
+          schema:
+            $ref: '#/definitions/files_handler.GetDownloadURLResponse'
+        "400":
+          description: Invalid file_id format
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: User not authenticated
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Access denied
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: File or version not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Failed to generate download URL
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - Bearer: []
+      summary: Get download URL for file version
+      tags:
+      - files
+  /files/{file_id}/versions/{version_num}/restore:
+    post:
+      consumes:
+      - application/json
+      description: Make a specific version the current version
+      parameters:
+      - description: File ID
+        format: uuid
+        in: path
+        name: file_id
+        required: true
+        type: string
+      - description: Version number to restore
+        in: path
+        name: version_num
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Version restored
+          schema:
+            $ref: '#/definitions/files_handler.FileResponse'
+        "400":
+          description: Invalid parameters
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: User not authenticated
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Access denied
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: File or version not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Failed to restore version
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - Bearer: []
+      summary: Restore file version
+      tags:
+      - files
+  /magic-links:
+    post:
+      consumes:
+      - application/json
+      description: Send magic link for authentication to user's email
+      parameters:
+      - description: User email and optional display name
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/auth_handlers.RequestMagicLinkRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success message
+          schema:
+            $ref: '#/definitions/auth_handlers.RequestMagicLinkResponse'
+        "400":
+          description: Invalid request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Request magic link
+      tags:
+      - auth
+  /magic-links/{token}:
+    get:
+      consumes:
+      - application/json
+      description: Verify magic link token and authenticate user
+      parameters:
+      - description: Magic link token
+        in: query
+        name: token
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Session data with tokens
+          schema:
+            $ref: '#/definitions/auth_handlers.VerifyMagicLinkResponse'
+        "400":
+          description: Missing token
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Invalid or expired token
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Verify magic link
+      tags:
+      - auth
+  /public-links/{file_id}:
+    post:
+      consumes:
+      - application/json
+      description: Generate a public shareable link for downloading the file
+      parameters:
+      - description: File ID
+        format: uuid
+        in: path
+        name: file_id
+        required: true
+        type: string
+      - description: Expiration time
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/files_handler.PublicLinkInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Public link created
+          schema:
+            $ref: '#/definitions/files_handler.PublicLinkResponse'
+        "400":
+          description: Invalid input
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: User not authenticated
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Access denied
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: File not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Failed to create public link
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - Bearer: []
+      summary: Create public link for file
+      tags:
+      - files
+  /public-links/{token}:
+    get:
+      consumes:
+      - application/json
+      description: Get presigned download URL for file using public link token (no
+        authentication required)
+      parameters:
+      - description: Public link token
+        in: path
+        name: token
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Download URL generated
+          schema:
+            $ref: '#/definitions/files_handler.PublicDownloadResponse'
+        "400":
+          description: Invalid token format
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Public link not found or expired
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Failed to generate download URL
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Download file by public link
+      tags:
+      - public
+  /tokens/refresh:
+    post:
+      consumes:
+      - application/json
+      description: Get new access token using refresh token
+      parameters:
+      - description: Refresh token
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/auth_handlers.RefreshTokenRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: New tokens
+          schema:
+            $ref: '#/definitions/auth_handlers.RefreshTokenResponse'
+        "401":
+          description: Invalid refresh token
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Refresh access token
+      tags:
+      - auth
+  /users/me:
+    delete:
+      consumes:
+      - application/json
+      description: Permanently delete user account and all associated data
+      parameters:
+      - description: Confirmation required
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/users_handler.DeleteAccountRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Account deleted
+          schema:
+            $ref: '#/definitions/users_handler.DeleteAccountResponse'
+        "400":
+          description: Invalid confirmation
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: User not authenticated
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: User not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - Bearer: []
+      summary: Delete user account
+      tags:
+      - users
+    get:
+      consumes:
+      - application/json
+      description: Retrieve authenticated user's profile information
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: User profile data
+          schema:
+            $ref: '#/definitions/users_handler.GetMeResponse'
+        "401":
+          description: User not authenticated
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: User not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - Bearer: []
+      summary: Get current user profile
+      tags:
+      - users
+    patch:
+      consumes:
+      - application/json
+      description: Update user's display name and email
+      parameters:
+      - description: Profile update data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/users_handler.UpdateProfileRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Profile updated
+          schema:
+            $ref: '#/definitions/users_handler.UpdateProfileResponse'
+        "400":
+          description: Invalid input
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: User not authenticated
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: User not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: Email already in use
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - Bearer: []
+      summary: Update user profile
+      tags:
+      - users
+swagger: "2.0"

@@ -1,0 +1,32 @@
+env: dev
+
+http:
+  addr: ":8080"
+
+log:
+  level: "debug"
+  format: "json"
+
+db:
+  dsn: "postgres://cfs:cfs@localhost:5432/cfs?sslmode=disable"
+
+smtp:
+  host: "smtp.gmail.com"
+  port: 587
+  name: 
+  email: 
+  password: 
+
+s3:
+  endpoint: "https://s3.ru-7.storage.selcloud.ru"
+  region: "ru-7"
+  bucket: "bloom-images"
+  access_key_id: 
+  secret_access_key: 
+  use_path_style: true
+
+rate_limits:
+  global_rps: 50
+
+features:
+  previews: true
