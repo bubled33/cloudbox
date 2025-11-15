@@ -4,238 +4,257 @@
 
 ---
 
-## Introduction
+### Introduction
 
-**Project**: Cloud File Storage (Google Drive Lite)
+**Cloud File Storage** is a Go‑based web service for storing, versioning, and sharing files via short‑lived public links, with background workers for preview generation and system metrics.  
+The project follows a layered, hexagonal architecture with explicit domain, application, infrastructure, API, and worker layers to keep business logic isolated from frameworks and external systems.  
 
-**Objective**: Development of a web service for storing, managing, and sharing files with support for versioning and preview generation.
+**Key features:**  
+- Passwordless authentication via email magic links and session tokens.  
+- File versioning with restore, metadata updates, and soft constraints on size and capacity.  
+- Temporary public links with strict TTL and automatic expiration workers.  
+- Asynchronous preview generation using a queue and dedicated worker.  
+- Built‑in metrics endpoint and OpenTelemetry tracing for observability.  
+- OpenAPI/Swagger documentation served directly from the running API.  
 
-| Metric                      | Symbol           | Requirement            |
-| --------------------------- | ---------------- | ---------------------- |
-| Service availability        | $Uptime$         | $Uptime \geq 99.5\%$   |
-| Recovery time objective     | $RTO$            | $RTO \leq 1 \text{ h}$ |
-| Recovery point objective    | $RPO$            | $RPO \leq 1 \text{ h}$ |
-| API response latency        | $Latency_{p95}$  | $\leq 200 \text{ ms}$  |
-| Throughput (upload)         | $RPS_{upload}$   | $\leq 100$             |
-| Throughput (download)       | $RPS_{download}$ | $\leq 300$             |
-| Concurrent users            | $N_{active}$     | $\geq 1000$            |
-| Max file size               | $Size_{file}$    | $\leq 10 \text{ GB}$   |
-| Total system capacity (MVP) | $Size_{total}$   | $\geq 1 \text{ TB}$    |
-| Preview processing time     | $T_{preview}$    | $\leq 30 \text{ s}$    |
-| Queue capacity              | $N_{queue}$      | $\leq 10^{4}$          |
-| Task success rate           | $P_{success}$    | $\geq 99\%$            |
-| Public link TTL             | $TTL_{link}$     | $\leq 600 \text{ s}$   |
+---
 
-<p>&nbsp;</p>
+### Non‑Functional Requirements
 
-## Technology Stack
+The system is designed as an MVP but targets production‑like constraints on availability, performance, and reliability.  
 
-The Cloud File Storage system is built using a **modern Go ecosystem**, combining high-performance web frameworks, reliable databases, scalable queues, and background workers.
+| Metric                      | Symbol             | Requirement                    |
+|----------------------------|--------------------|--------------------------------|
+| Service availability        | \(Uptime\)         | \(Uptime \geq 99.5\%\)         |
+| Recovery time objective     | \(RTO\)            | \(RTO \leq 1 \text{ h}\)       |
+| Recovery point objective    | \(RPO\)            | \(RPO \leq 1 \text{ h}\)       |
+| API response latency        | \(Latency_{p95}\)  | \(\leq 200 \text{ ms}\)        |
+| Throughput (upload)         | \(RPS_{upload}\)   | \(\leq 100\)                   |
+| Throughput (download)       | \(RPS_{download}\) | \(\leq 300\)                   |
+| Concurrent users            | \(N_{active}\)     | \(\geq 1000\)                  |
+| Max file size               | \(Size_{file}\)    | \(\leq 10 \text{ GB}\)         |
+| Total system capacity (MVP) | \(Size_{total}\)   | \(\geq 1 \text{ TB}\)          |
+| Preview processing time     | \(T_{preview}\)    | \(\leq 30 \text{ s}\)          |
+| Queue capacity              | \(N_{queue}\)      | \(\leq 10^{4}\)                |
+| Task success rate           | \(P_{success}\)    | \(\geq 99\%\)                  |
+| Public link TTL             | \(TTL_{link}\)     | \(\leq 600 \text{ s}\)         |
 
-| Layer / Purpose               | Technology / Library                          | Notes / Usage |
-|-------------------------------|-----------------------------------------------|---------------|
-| **Programming Language**      | Go (Golang)                                   | Main backend language, compiles to a single binary, suitable for high-performance services |
-| **Web Framework / Router**    | [Gin](https://github.com/gin-gonic/gin)       | High-performance HTTP framework, lightweight and convenient for REST APIs |
-| **Database**                  | PostgreSQL                                    | Relational database for storing users, files, file versions, and links |
-| **ORM / Database Access**     | [GORM](https://gorm.io/)                       | Popular Go ORM, supports migrations and table relationships |
-| **Object Storage**            | S3 / MinIO                                    | File storage (up to 10 GB), MinIO for local development, S3 for production |
-| **Queue / Message Broker**    | Apache Kafka                                  | Asynchronous task processing (Preview Worker, Public Link Expirer) |
-| **Authentication / Magic Link** | JWT / custom magic link flow                 | Passwordless login via temporary links, tokens stored in the database |
-| **Background Workers**        | Go routines + Kafka consumers                 | Asynchronous task processing, scalable with multiple worker instances |
-| **Configuration / Env**       | Viper / Envconfig                             | Configuration management, environment variables |
-| **Logging / Monitoring**      | Logrus / Zap                                  | Logging for debugging and monitoring |
-| **Testing / QA**              | Go test, Testify                               | Unit tests and integration tests |
-| **Containerization / Deployment** | Docker / Docker Compose                     | Simplified local development and production deployment |
-| **CI/CD**                     | GitHub Actions / GitLab CI                     | Automated build, tests, and deployment |
+These constraints inform design decisions like asynchronous task processing, separation of API and workers, and basic observability tooling.  
 
-> 💡 **Notes:**  
-> - **Gin + GORM** is a lightweight and standard stack for Go web services.  
-> - **Kafka** allows scaling background workers and handling high task volumes asynchronously.  
-> - **MinIO** is used for local development instead of S3.  
-> - **Workers** use Go routines and Kafka consumers to keep API responsive while processing heavy tasks asynchronously.
+---
 
-<p>&nbsp;</p>
+### Technology Stack
 
-## Architecture
+The project uses a modern Go ecosystem with standard tools for REST APIs, storage, queuing, and documentation.  
 
-**Project Architecture**: Cloud File Storage is implemented as a **monolithic application** using a layered and hexagonal approach.  
-This structure ensures clear separation of responsibilities, testability, and maintainability while keeping deployment simple.
+| Layer / Purpose                 | Technology / Library                               | Notes / Usage |
+|---------------------------------|----------------------------------------------------|---------------|
+| Programming Language            | Go (Golang)                                        | Main backend language for API and workers. |
+| HTTP framework / Router         | Gin                                                | Lightweight, high‑performance HTTP router for REST. |
+| API documentation              | Swag + gin‑swagger                                 | Generates and serves Swagger UI at `/swagger`. |
+| Database                        | PostgreSQL                                         | Stores users, sessions, files, versions, links, events. |
+| SQL Migrations                  | SQL files under `migrations/`                      | Versioned schema migrations applied on startup or via tooling. |
+| ORM / Data access               | Custom repositories over `database/sql`            | Query/command repositories in `internal/infra/db`. |
+| Object Storage                  | S3 / MinIO                                         | Blob storage for file contents and previews. |
+| Queue / Message broker          | Kafka‑style interfaces + in‑memory mock            | Preview and event queues with mock implementation for local use. |
+| Authentication / Magic links    | Custom service + SMTP email                        | Passwordless login via signed magic links and sessions. |
+| Background workers              | Go binaries in `cmd/preview-worker`, `cmd/link-expirer` | Process previews, public link expiry, metrics, and events. |
+| Configuration                   | YAML (`configs/`) + `.env`                         | Base and environment‑specific configuration plus overrides. |
+| Logging                         | Standard logging (can be swapped to Zap/Logrus)    | Centralized logging from API and workers. |
+| Metrics                         | `/api/v1/metrics` HTTP endpoint                    | Prometheus‑friendly metrics exported by a metrics worker. |
+| Tracing                         | OpenTelemetry (stdout exporter)                    | Distributed tracing via middleware and SDK tracer provider. |
+| Testing                         | `go test`, integration tests under `internal/test` | Unit, integration, and infrastructure tests for DB, S3, Kafka, API. |
+| Containerization (optional)     | Docker / Docker Compose                            | Used to orchestrate Postgres, MinIO, and Kafka in development. |
 
-**Layered Structure**:
-- **Presentation / API Layer** – handles HTTP requests, magic links, file upload/download, and public link generation.
-- **Application / Service Layer** – coordinates file operations, versioning, link management, and background tasks.
-- **Domain / Core Layer** – contains business logic and entities (User, File, FileVersion, MagicLink, PublicLink).
-- **Infrastructure Layer** – concrete implementations of external dependencies: database (Postgres), object storage (S3/MinIO), task queue (Redis/RabbitMQ/Kafka).
+This stack keeps the runtime lightweight while leaving room to plug in real Kafka, external SMTP, and production‑grade tracing or logging in the future.  
 
-**Hexagonal (Ports & Adapters) Principles**:
-- The **Domain Layer** is independent of external services.
-- **Ports** define interfaces for database access, storage operations, and queue interactions.
-- **Adapters** implement these interfaces, allowing easy replacement of infrastructure components without changing business logic.
+---
 
-**Background Workers**:
-- **Preview Worker** – asynchronously generates file previews by consuming tasks from the queue.
-- **Public Link Expirer** – deactivates public links after TTL expires.
-- Workers run inside the monolith but interact through the task queue for asynchronous execution and scalability.
+### Project Structure
 
-> ⚠️ **Monolith vs Microservices:**  
-> Although modern cloud systems often use **microservices**, this project is implemented as a **monolith** for practical reasons.  
-> 
-> - **Simplicity** – keeping all business logic, API routes, and background workers in a single application makes the code easier to understand and maintain.  
-> - **Ease of Deployment** – only one service needs to be deployed, while external dependencies like the database, object storage, and task queue remain separate.  
-> - **Testing and Development** – running a monolith locally is straightforward, without managing multiple interdependent services.  
-> - **Scalability of Critical Components** – even in a monolithic setup, the **Preview Worker** and **Public Link Expirer** can scale independently via multiple processes and queues.  
-> - **Future Flexibility** – the codebase is organized with **Layered + Hexagonal architecture**, so it can be refactored into microservices if needed.
+The repository follows a classic Go layout with `cmd` for binaries and `internal` for private application code, reflecting hexagonal architecture and domain‑driven design principles.  
 
-<p>&nbsp;</p>
+```
+cmd/
+  api/             # HTTP API server entrypoint
+  preview-worker/  # Background preview generation worker
+  link-expirer/    # Public link expiration / maintenance worker
+  docs/            # Swagger docs entrypoint
 
-![Component Diagram](./docs/architecture.svg)
+internal/
+  api/             # HTTP handlers, routing, middleware
+  app/             # Application services, unit-of-work
+  domain/          # Entities, value objects, domain events, interfaces
+  infra/           # DB, queue, SMTP, storage adapters
+  workers/         # Worker logic (preview, metrics, file checks, publishing)
+  config/          # Configuration loading
+  test/            # Integration tests (DB, S3, Kafka, API)
+```
 
-<p>&nbsp;</p>
+- `internal/domain` defines core entities (user, file, file version, magic link, session, public link) plus value objects and domain events.  
+- `internal/app` orchestrates use cases via services, unit of work, and dependency‑free business workflows.  
+- `internal/infra` provides concrete adapters for Postgres repositories, Kafka‑style queues, S3 storage, SMTP mailer, and logging.  
+- `internal/api` contains Gin handlers, DTOs, presenters, and middleware for auth, error handling, and tracing.  
+- `internal/workers` implements preview generation, metrics aggregation, file consistency checks, and event publishing.  
 
-## User Flow
+This separation keeps frameworks and drivers at the edges while protecting core domain logic from direct coupling to HTTP, SQL, or storage details.  
 
-The following diagram illustrates the key user scenario in **Cloud File Storage**: uploading a file and generating a temporary public link.  
+---
 
-<p>&nbsp;</p>
+### Runtime Components
 
-![Component Diagram](./docs/userflow.svg)
+The system is a monorepo with multiple processes compiled from separate `cmd/*` packages.  
 
-<p>&nbsp;</p>
+- **API Server (`cmd/api`)** — exposes REST API, serves Swagger UI, handles auth, file operations, and public link management.  
+- **Preview Worker (`cmd/preview-worker`)** — consumes preview tasks from the queue, generates thumbnails, and writes them to S3/MinIO.  
+- **Link Expirer (`cmd/link-expirer`)** — deactivates expired public links based on TTL and domain events.  
+- **Metrics Worker** — consumes events and updates metrics exposed at `/api/v1/metrics`.  
+- **File Checker Worker** — periodically verifies file storage consistency and may trigger repair or cleanup tasks.  
+- **Event Publisher Worker** — pulls unprocessed domain events and publishes them to the event queue or external sinks.  
 
-**Explanation of Components:**
+All these components share the same domain and application layers, ensuring consistent business rules across API and workers.  
 
-- **User / App** – initiates actions such as login and file upload.  
-- **DB: Files / FileVersions** – stores metadata and version history.  
-- **S3 / Object Storage** – stores actual file content and generated previews.  
-- **Queue: Preview Tasks** – manages asynchronous preview generation.  
-- **Preview Worker** – consumes tasks from the queue to generate previews.  
-- **Generate Public Link** – creates temporary links for file sharing.  
+---
 
-> ⚠️ **Note:** Only the **upload file** and **generate public link** endpoints are shown in this flow.  
-> The full system contains additional endpoints (versioning, download, deletion, etc.), but they are omitted here for clarity, focusing on the main user interaction path.
+### Architecture
 
-<p>&nbsp;</p>
+The design combines layered and hexagonal patterns with domain events and queues to decouple operations and enable background processing.  
 
-## ER Diagram
+**Layered structure:**  
+- **Domain layer** — entities, aggregates, value objects, and domain interfaces for storage, queues, notifications, and time.  
+- **Application layer** — services implementing use cases (auth, user, file, file version, magic link, session, public link, events) plus a unit‑of‑work.  
+- **Infrastructure layer** — concrete adapters for Postgres repositories, Kafka‑style queues, S3 storage, SMTP, logging, and metrics.  
+- **Interface layer** — HTTP handlers, DTO mapping, presenters, middleware, and worker entrypoints.  
 
-The diagram below shows the main entities of the **Cloud File Storage** system (Google Drive Lite), including users, files, file versions, sessions, magic links, and public links.  
-It illustrates the relationships between tables and the cardinality of each association.
+**Hexagonal / Ports & Adapters:**  
+- Domain code depends only on small interfaces for storage, queues, notifications, and clocks.  
+- The application layer coordinates domain operations and uses the unit‑of‑work to ensure consistent persistence.  
+- Infrastructure adapters implement ports for Postgres, MinIO/S3, Kafka, and SMTP without leaking their APIs into domain code.  
 
-**Legend:**
-- `{PK}` = Primary Key  
-- `{FK}` = Foreign Key  
-- `ON DELETE CASCADE` = dependent rows are automatically deleted  
-- `1` = one, `*` = many  
-- Denormalization: some fields (e.g., `name`, `size`, `mime` in `files`) are duplicated from `file_versions` for faster access.
+This approach allows switching from in‑memory queues to real Kafka or from mock storage to S3/MinIO with minimal impact on business logic.  
 
-> ⚠️ **Note on normalization:**  
-> The `files` table duplicates some attributes from `file_versions` (name, size, mime, etc.).  
-> This technically violates **3rd Normal Form (3NF)** because these attributes depend on the related `file_versions` record, not directly on the `files` primary key.  
-> This denormalization is intentional to speed up queries for listing files, showing file metadata, and avoiding frequent joins. In production systems, this trade-off is common for performance reasons.
+---
 
-<p>&nbsp;</p>
+### User Flow
 
-![ER Diagram](./docs/models.svg)
+The main user flows are upload, versioning, and sharing via short‑lived public links, with diagrams under `./docs/userflow.svg`.  
 
-<p>&nbsp;</p>
+**Typical scenario:**  
+1. User requests a magic link by email and receives a signed URL.  
+2. User clicks the link, which is verified; a session is created and tied to device and IP information.  
+3. Authenticated user uploads a file, which creates an initial `FileVersion` and stores the blob in S3/MinIO.  
+4. A preview task is enqueued; the preview worker generates an image and stores it in object storage.  
+5. User generates a public link with a short TTL and shares it; the link expirer worker deactivates it after expiration.  
 
-## Security / Authentication
+The ER diagram at `./docs/models.svg` documents the schema and relationships between users, sessions, magic links, files, versions, events, and public links.  
 
-The Cloud File Storage system implements **passwordless authentication** and several security measures to protect user data, files, and public links.
+---
 
-### Authentication
+### Security and Authentication
 
-- **Magic Links (Passwordless Login)**  
-  - Users authenticate via temporary magic links sent to their email.  
-  - Each magic link contains a **signed token** with an expiration time (TTL).  
-  - Once verified, a **session token (JWT)** is issued for API requests.  
-  - No passwords are stored in the database, reducing the risk of credential leaks.
+Authentication is fully passwordless and based on email magic links plus session management endpoints for revocation and device control.  
 
-- **Session Management**  
-  - Sessions are stored in the database with expiration times.  
-  - API requests must include a valid session token in the `Authorization` header.  
-  - Expired sessions require users to request a new magic link.
+**Magic links:**  
+- User submits email to request a login link; the system generates a signed token with an expiration time.  
+- Token and metadata (user, IP, device, `expires_at`) are stored in the database and sent via SMTP.  
+- When the user opens the magic link, the token is validated and a persistent session is created.  
 
-### Authorization
+**Sessions:**  
+- Sessions are persisted with ownership, device information, IP, and expiry timestamps.  
+- API exposes endpoints for listing active sessions, revoking a single session, revoking all sessions, and logging out current session.  
+- Refresh token endpoint allows rotating access tokens while keeping long‑lived sessions under control.  
 
-- **File Access Control**  
-  - Users can only access files they own or files shared via valid public links.  
-  - Database foreign key constraints and application logic enforce ownership rules.
+**Authorization and data access:**  
+- Authenticated users can only access their own files and versions, enforced via foreign keys and domain checks.  
+- Public link access bypasses authentication but is read‑only, time‑limited, and bound to a specific file or version.  
+- Deleting a file cascades to versions, previews, public links, and related events according to schema constraints.  
 
-- **Public Links**  
-  - Temporary links have a **TTL ≤ 600 seconds**.  
-  - **Public Link Expirer** automatically deactivates expired links.  
-  - Access via public links bypasses authentication but is limited to read-only operations.
+Transport security is intended to be enforced via HTTPS termination at an upstream proxy or ingress in real deployments.  
 
-### Data Protection
+---
 
-- **Transport Security**  
-  - All API traffic must use HTTPS.  
-- **File Storage Security**  
-  - S3/MinIO buckets can be configured with server-side encryption.  
-- **Sensitive Data Handling**  
-  - Only minimal metadata is stored in the database; no plaintext passwords.  
+### API Overview
 
-> 💡 **Notes:**  
-> - The combination of passwordless login, TTL-based links, and secure transport ensures both usability and security.  
-> - Additional measures, such as 2FA or encryption at rest for files, can be added in future improvements.
+The API is versioned under `/api/v1` and documented via Swagger; the Swagger UI is served at `/swagger/index.html` by the gin‑swagger middleware.  
 
-<p>&nbsp;</p>
+**Public endpoints:**  
 
-## API Documentation
+| Endpoint                         | Method | Description |
+|----------------------------------|--------|-------------|
+| `/swagger/*any`                  | GET    | Serve Swagger UI and OpenAPI spec. |
+| `/api/v1/metrics`               | GET    | Expose metrics. |
+| `/api/v1/magic-links`           | POST   | Request passwordless login link by email. |
+| `/api/v1/magic-links/{token}`   | GET    | Verify magic link and create a session. |
+| `/api/v1/auth/tokens/refresh`   | POST   | Refresh access token using a valid session. |
+| `/api/v1/public-links/{token}`  | GET    | Download a file via public link token. |
 
-The Cloud File Storage system exposes a **RESTful API** to manage users, files, file versions, magic links, and public links. All endpoints use **JSON** for request and response payloads.
+**Authenticated endpoints (require Authorization header):**  
 
-| Endpoint                                   | Method | Description                                         | Request Body / Params | Response |
-|--------------------------------------------|--------|-----------------------------------------------------|---------------------|---------|
-| `/auth/magic-link`                          | POST   | Request a passwordless login link for a user       | `{ "email": "user@example.com" }` | `{ "magic_link": "https://..." }` |
-| `/auth/magic-link/verify`                   | POST   | Verify magic link and create a session             | `{ "token": "..." }` | `{ "session_id": "..." }` |
-| `/files/upload`                             | POST   | Upload a **new file** and create its initial version | `{ "name": "file.pdf", "size": 1024 }` | `{ "file_id": 123, "upload_url": "https://..." }` |
-| `/files/{file_id}/upload`                   | POST   | Upload a **new version** of an existing file       | Path param: `file_id`, `{ "size": 2048 }` | `{ "version_id": 2, "upload_url": "https://..." }` |
-| `/files/{file_id}`                           | GET    | Retrieve file metadata (latest version, owner, name, size, created_at) | Path param: `file_id` | `{ "id": 123, "name": "...", "size": 1024, "owner_id": 1, "latest_version": 2, "created_at": "..." }` |
-| `/files/{file_id}/rename`                   | PATCH  | Rename a file                                      | Path param: `file_id`, `{ "name": "new_name.pdf" }` | `{ "status": "renamed", "new_name": "new_name.pdf" }` |
-| `/files/download/{file_id}`                 | GET    | Download the **latest version** of a file          | Path param: `file_id` | File stream |
-| `/files/{file_id}/versions`                 | GET    | List all versions of a file                         | Path param: `file_id` | `[ { "version_id": 1, "size": 1024, "created_at": "..." }, ... ]` |
-| `/files/{file_id}/versions/{version_id}`    | GET    | Retrieve metadata of a specific version           | Path param: `file_id`, `version_id` | `{ "version_id": 2, "size": 2048, "created_at": "..." }` |
-| `/files/{file_id}/versions/{version_id}/restore` | POST | Restore a specific version as the latest version   | Path param: `file_id`, `version_id` | `{ "status": "restored" }` |
-| `/files/{file_id}/versions/{version_id}`    | DELETE | Delete a specific version of a file               | Path param: `file_id`, `version_id` | `{ "status": "deleted" }` |
-| `/files/{file_id}/preview`                  | GET    | Get the **preview** for the latest version of a file | Path param: `file_id` | Image/Thumbnail stream |
-| `/files/{file_id}`                           | DELETE | Delete a file and **all its versions**, including previews and public links | Path param: `file_id` | `{ "status": "deleted" }` |
-| `/public-links`                             | POST   | Generate a temporary public link for a file       | `{ "file_id": 123, "ttl": 600 }` | `{ "public_link": "https://..." }` |
-| `/public-links/{link_id}`                   | GET    | Access a file via public link                      | Path param: `link_id` | File stream |
-| `/public-links/{link_id}`                   | DELETE | Delete a specific public link                      | Path param: `link_id` | `{ "status": "deleted" }` |
-| `/users/me`                                 | GET    | Retrieve current user profile                      | Auth token in header | `{ "id": 1, "email": "user@example.com", "files": [...] }` |
+| Group / Endpoint                             | Method | Description |
+|----------------------------------------------|--------|-------------|
+| `/api/v1/auth/sessions`                      | GET    | List active sessions for current user. |
+| `/api/v1/auth/sessions/{session_id}`         | DELETE | Revoke a specific session. |
+| `/api/v1/auth/sessions`                      | DELETE | Revoke all sessions. |
+| `/api/v1/auth/sessions/current`              | DELETE | Logout from current session. |
+| `/api/v1/users/me`                           | GET    | Get current user profile and basic stats. |
+| `/api/v1/users/me`                           | PATCH  | Update profile fields such as display name. |
+| `/api/v1/users/me`                           | DELETE | Delete account and owned resources. |
+| `/api/v1/files`                              | GET    | List user files with latest version metadata. |
+| `/api/v1/files`                              | POST   | Create file and initial version, return upload URL. |
+| `/api/v1/files/{file_id}`                    | GET    | Get file metadata including latest version. |
+| `/api/v1/files/{file_id}`                    | PATCH  | Update file metadata (for example, rename). |
+| `/api/v1/files/{file_id}`                    | DELETE | Delete file, its versions, previews, and links. |
+| `/api/v1/files/{file_id}/versions`           | GET    | List versions of a file. |
+| `/api/v1/files/{file_id}/versions`           | POST   | Upload a new version, return upload URL. |
+| `/api/v1/files/{file_id}/versions/{num}/content` | GET | Get signed download URL for a specific version. |
+| `/api/v1/files/{file_id}/versions/{num}/restore` | POST | Mark a specific version as the latest. |
+| `/api/v1/files/{file_id}/public-links`       | GET    | List active public links for a file. |
+| `/api/v1/files/{file_id}/public-links`       | POST   | Create a new public link with TTL. |
+| `/api/v1/files/{file_id}/public-links/{link_id}` | DELETE | Revoke a specific public link. |
 
-> 💡 **Notes:**  
-> - **File Versioning:** Each upload to `/files/{file_id}/upload` creates a new `FileVersion` record, while the main `Files` table keeps metadata for the latest version.  
-> - **Deletion:**  
->   - `/files/{file_id}` removes the main file, all versions, previews, and associated public links (`ON DELETE CASCADE`).  
->   - `/files/{file_id}/versions/{version_id}` deletes a single version.  
->   - `/public-links/{link_id}` allows manual removal of a single public link.  
-> - **Restore Version:** `/files/{file_id}/versions/{version_id}/restore` sets a previous version as the latest version.  
-> - **Preview Generation:** Previews are generated asynchronously; they may be temporarily unavailable after a new version is uploaded.  
-> - **Public Links:** Respect `TTL ≤ 600 seconds` and expire automatically via the **Public Link Expirer**.  
-> - All endpoints except public links require authentication via session token.
+The exact request and response schemas, including DTOs and error formats, are defined in the generated Swagger spec under `./docs/swagger.yaml` and `./docs/swagger.json`.  
 
-<p>&nbsp;</p>
+---
 
-## Future Improvements / Scalability
+### Observability (Metrics and Tracing)
 
-The Cloud File Storage system is designed as an MVP with a **monolithic architecture**, but several improvements can be implemented in the future to enhance functionality, performance, and scalability.
+Observability is built into the service through a metrics endpoint and OpenTelemetry tracing configured in the API server.  
 
-| Area                        | Possible Improvements / Enhancements                 | Notes |
-|------------------------------|------------------------------------------------------|-------|
-| **Asynchronous Tasks**       | Add antivirus scanning, notifications (email/webhook), temporary file cleanup | Offload additional heavy tasks to background workers via the queue to keep API responsive |
-| **File Storage / CDN**       | Integrate a CDN for file delivery and preview assets | Improves download speed for end users globally |
-| **Database Scaling**         | Implement read replicas, partitioning, or sharding | Allows handling higher user and file volume while maintaining low latency |
-| **Microservices Transition** | Split monolith into microservices (e.g., API, preview generation, link management) | Provides independent deployment, scaling, and fault isolation |
-| **Advanced Search & Indexing** | Full-text search for file metadata, tags, and content indexing | Improves user experience for large datasets |
-| **Security Enhancements**    | Add encryption at rest for files, 2FA for users, improved token management | Increases protection for sensitive data |
-| **Monitoring / Observability** | Implement Prometheus + Grafana for metrics, alerts, and dashboards | Helps detect bottlenecks and maintain uptime ≥ 99.5% |
-| **Horizontal Scaling of Workers** | Deploy multiple Preview Worker and Expirer instances | Ensures processing capacity meets peak demand (up to 10k tasks in queue) |
+- The API exposes `/api/v1/metrics`, which is intended to be scraped by Prometheus or compatible systems.  
+- A metrics worker consumes events and aggregates counters or histograms for requests, tasks, and domain operations.  
+- OpenTelemetry is initialized in `cmd/api/main.go` using a stdout exporter and tracer provider, and a tracing middleware wraps the request lifecycle.  
+- Traces can later be redirected to Jaeger, Tempo, or another backend by swapping the exporter.  
 
-> 💡 **Notes:**  
-> - These improvements are optional for MVP but planned for future versions.  
-> - The current **Layered + Hexagonal architecture** allows easy refactoring to microservices or scaling individual components without major rewrites.  
-> - Priority should be given to asynchronous task scaling and storage optimization to maintain performance and responsiveness for 1000+ concurrent users.
+This setup enables basic monitoring of latency, throughput, and failure rates without changing the business logic.  
 
+---
+
+### Local Development
+
+Local development assumes a running Postgres instance plus optional MinIO and Kafka‑like services, which can be orchestrated via Docker Compose.  
+
+Typical workflow:  
+1. Copy and adjust configuration files under `configs/config.base.yaml` and `configs/config.dev.yaml`, plus `.env` for secrets.  
+2. Start dependencies (Postgres, MinIO, queue) locally or via Docker.  
+3. Run migrations from the `migrations/` directory using your preferred migration tool.  
+4. Start the API server using `go run ./cmd/api`.  
+5. Optionally start `go run ./cmd/preview-worker` and `go run ./cmd/link-expirer` for background processing.  
+6. Open `/swagger/index.html` to explore and test the API interactively.  
+
+Tests can be executed via `go test ./...`, including integration tests that interact with Postgres, MinIO, and the queue mocks.  
+
+---
+
+### Future Improvements
+
+While the current design already separates core logic, infrastructure, and runtime components, several improvements are natural next steps.  
+
+- Replace in‑memory queues with a real Kafka cluster in non‑test environments.  
+- Add antivirus scanning, content classification, and webhooks as additional asynchronous tasks.  
+- Introduce a CDN in front of file downloads and previews for global performance.  
+- Enhance search with full‑text indexing and tags for large file collections.  
+- Harden security with optional 2FA, stricter token policies, and per‑device approvals.  
+- Wire tracing and metrics into a full observability stack using Prometheus, Loki, and Tempo or Jaeger.  
+
+The existing hexagonal structure and clear separation of API, workers, and infrastructure make it straightforward to evolve this MVP toward a more distributed or microservice‑oriented architecture if future load requires it.  
+```
