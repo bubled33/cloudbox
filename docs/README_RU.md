@@ -1,6 +1,6 @@
 # Cloud File Storage (Google Drive Lite)
 
-> Язык / Language: RU | [EN](./README_RU.md)
+> Язык / Language: RU | [EN](/README.md)
 
 ---
 
