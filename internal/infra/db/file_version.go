@@ -104,7 +104,6 @@ func scanFileVersion(scanner scannable) (*file_version.FileVersion, error) {
 		&v.CreatedAt,
 		&v.UpdatedAt,
 	); err != nil {
-		fmt.Printf("scanFileVersion: Scan error: %v\n", err)
 		return nil, err
 	}
 
@@ -112,53 +111,43 @@ func scanFileVersion(scanner scannable) (*file_version.FileVersion, error) {
 
 	v.S3Key, err = file_version.NewS3Key(s3Key)
 	if err != nil {
-		fmt.Printf("scanFileVersion: Invalid S3Key: %v\n", err)
 		return nil, err
 	}
 
 	if previewS3KeyNullStr.Valid {
-		fmt.Printf("scanFileVersion: Preview S3 key found: %s\n", previewS3KeyNullStr.String)
 		previewS3Key, err := file_version.NewS3Key(previewS3KeyNullStr.String)
 		if err != nil {
-			fmt.Printf("scanFileVersion: Invalid preview S3Key: %v\n", err)
 			return nil, err
 		}
 		v.PreviewS3Key = &previewS3Key
 	} else {
-		fmt.Println("scanFileVersion: Preview S3 key is NULL")
 		v.PreviewS3Key = nil
 	}
 
 	v.Mime, err = file_version.NewMimeType(mime)
 	if err != nil {
-		fmt.Printf("scanFileVersion: Invalid MIME type: %v\n", err)
 		return nil, err
 	}
 
 	v.Status, err = file_version.NewFileStatus(status)
 	if err != nil {
-		fmt.Printf("scanFileVersion: Invalid status: %v\n", err)
 		return nil, err
 	}
 
 	v.Size, err = file_version.NewFileSize(size)
 	if err != nil {
-		fmt.Printf("scanFileVersion: Invalid size: %v\n", err)
 		return nil, err
 	}
 
 	v.VersionNum, err = file_version.NewFileVersionNum(versionNum)
 	if err != nil {
-		fmt.Printf("scanFileVersion: Invalid version number: %v\n", err)
 		return nil, err
 	}
 
-	fmt.Printf("scanFileVersion: Successfully scanned version %s\n", v.ID)
 	return &v, nil
 }
 
 func (r *FileVersionQueryRepository) GetByID(ctx context.Context, id uuid.UUID) (*file_version.FileVersion, error) {
-	fmt.Printf("GetByID: Fetching file version with ID: %s\n", id)
 
 	row := r.db.QueryRowContext(ctx, `
         SELECT id, s3_key, preview_s3_key, mime, status, size, version_num,
@@ -169,18 +158,12 @@ func (r *FileVersionQueryRepository) GetByID(ctx context.Context, id uuid.UUID) 
 
 	v, err := scanFileVersion(row)
 	if err == sql.ErrNoRows {
-		fmt.Printf("GetByID: No file version found with ID: %s\n", id)
 		return nil, nil
-	}
-	if err != nil {
-		fmt.Printf("GetByID: Error scanning file version: %v\n", err)
 	}
 	return v, err
 }
 
 func (r *FileVersionQueryRepository) GetByFileID(ctx context.Context, fileID uuid.UUID) ([]*file_version.FileVersion, error) {
-	fmt.Printf("GetByFileID: Fetching file versions for file ID: %s\n", fileID)
-
 	rows, err := r.db.QueryContext(ctx, `
         SELECT id, s3_key, preview_s3_key, mime, status, size, version_num,
                file_id, uploaded_by_session_id, created_at, updated_at
@@ -189,7 +172,6 @@ func (r *FileVersionQueryRepository) GetByFileID(ctx context.Context, fileID uui
         ORDER BY version_num DESC
     `, fileID)
 	if err != nil {
-		fmt.Printf("GetByFileID: Query error: %v\n", err)
 		return nil, fmt.Errorf("failed to query file versions: %w", err)
 	}
 	defer rows.Close()
@@ -199,23 +181,19 @@ func (r *FileVersionQueryRepository) GetByFileID(ctx context.Context, fileID uui
 	for rows.Next() {
 		v, err := scanFileVersion(rows)
 		if err != nil {
-			fmt.Printf("GetByFileID: Scan error: %v\n", err)
 			return nil, fmt.Errorf("failed to scan file version: %w", err)
 		}
 		versions = append(versions, v)
 	}
 
 	if err = rows.Err(); err != nil {
-		fmt.Printf("GetByFileID: Row iteration error: %v\n", err)
 		return nil, fmt.Errorf("error iterating rows: %w", err)
 	}
 
-	fmt.Printf("GetByFileID: Retrieved %d versions for file ID: %s\n", len(versions), fileID)
 	return versions, nil
 }
 
 func (r *FileVersionQueryRepository) GetAll(ctx context.Context) ([]*file_version.FileVersion, error) {
-	fmt.Println("GetAll: Fetching all file versions")
 
 	rows, err := r.db.QueryContext(ctx, `
         SELECT id, s3_key, preview_s3_key, mime, status, size, version_num,
@@ -232,31 +210,25 @@ func (r *FileVersionQueryRepository) GetAll(ctx context.Context) ([]*file_versio
 	for rows.Next() {
 		s, err := scanFileVersion(rows)
 		if err != nil {
-			fmt.Printf("GetAll: Scan error: %v\n", err)
 			return nil, err
 		}
 		fileVersions = append(fileVersions, s)
 	}
 
 	if err := rows.Err(); err != nil {
-		fmt.Printf("GetAll: Row iteration error: %v\n", err)
 		return nil, err
 	}
 
-	fmt.Printf("GetAll: Retrieved %d total file versions\n", len(fileVersions))
 	return fileVersions, nil
 }
 
 func (r *FileVersionQueryRepository) GetAllByStatus(ctx context.Context, status file_version.FileStatus) ([]*file_version.FileVersion, error) {
-	fmt.Printf("GetAllByStatus: Fetching file versions with status: %s\n", status.String())
-
 	rows, err := r.db.QueryContext(ctx, `
         SELECT id, s3_key, preview_s3_key, mime, status, size, version_num,
                file_id, uploaded_by_session_id, created_at, updated_at
         FROM file_versions WHERE status = $1 ORDER BY created_at DESC
     `, status.String())
 	if err != nil {
-		fmt.Printf("GetAllByStatus: Query error: %v\n", err)
 		return nil, err
 	}
 	defer rows.Close()
@@ -265,17 +237,14 @@ func (r *FileVersionQueryRepository) GetAllByStatus(ctx context.Context, status 
 	for rows.Next() {
 		s, err := scanFileVersion(rows)
 		if err != nil {
-			fmt.Printf("GetAllByStatus: Scan error: %v\n", err)
 			return nil, err
 		}
 		fileVersions = append(fileVersions, s)
 	}
 
 	if err := rows.Err(); err != nil {
-		fmt.Printf("GetAllByStatus: Row iteration error: %v\n", err)
 		return nil, err
 	}
 
-	fmt.Printf("GetAllByStatus: Retrieved %d versions with status: %s\n", len(fileVersions), status.String())
 	return fileVersions, nil
 }

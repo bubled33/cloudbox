@@ -3,7 +3,6 @@ package db
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -52,14 +51,6 @@ func (r *SessionCommandRepository) Save(ctx context.Context, s *session.Session)
 		s.UpdatedAt,
 		expiresAtTime,
 	)
-
-	if err != nil {
-		fmt.Printf("ERROR executing query: %v\n", err)
-	} else {
-		fmt.Printf("Query executed successfully\n")
-	}
-	fmt.Printf("=== END SAVE DEBUG ===\n")
-
 	return err
 }
 

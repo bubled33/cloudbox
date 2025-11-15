@@ -1,3 +1,4 @@
+basePath: /api/v1
 definitions:
   auth_handlers.ActiveSessionsResponse:
     properties:
@@ -405,6 +406,8 @@ definitions:
     type: object
 info:
   contact: {}
+  title: Cloud file storage
+  version: "1.0"
 paths:
   /auth/sessions:
     delete:
@@ -1171,6 +1174,17 @@ paths:
       summary: Verify magic link
       tags:
       - auth
+  /metrics:
+    get:
+      description: Returns Prometheus metrics for monitoring
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: Prometheus metrics in text format
+      summary: Get Prometheus metrics
+      tags:
+      - metrics
   /public-links/{file_id}:
     post:
       consumes:
@@ -1434,4 +1448,9 @@ paths:
       summary: Update user profile
       tags:
       - users
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"

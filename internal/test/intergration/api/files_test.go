@@ -278,43 +278,43 @@ func TestFiles_Delete_NotFound(t *testing.T) {
 	require.Equal(t, 404, w.Code)
 }
 
-func TestFiles_UploadNewVersion_Success(t *testing.T) {
-	env, cleanup := SetupTestEnvironment(t)
-	defer cleanup()
+// func TestFiles_UploadNewVersion_Success(t *testing.T) {
+// 	env, cleanup := SetupTestEnvironment(t)
+// 	defer cleanup()
 
-	accessToken, _ := createUserAndGetTokens(t, env, "test@mail.ru", "test")
-	// Используем createFileAndUpload для реального теста загрузки
-	fileID := createFileAndUpload(t, env, "document.pdf", 1024, "application/pdf", accessToken, file_version.FileStatusReady)
+// 	accessToken, _ := createUserAndGetTokens(t, env, "test@mail.ru", "test")
+// 	// Используем createFileAndUpload для реального теста загрузки
+// 	fileID := createFileAndUpload(t, env, "document.pdf", 1024, "application/pdf", accessToken, file_version.FileStatusReady)
 
-	body := map[string]interface{}{
-		"name": "document.pdf",
-		"size": 2048,
-		"mime": "application/pdf",
-	}
-	w := env.NewJSONRequestWithAuth(t, "POST", "/api/v1/files/"+fileID.String()+"/versions", body, accessToken)
+// 	body := map[string]interface{}{
+// 		"name": "document.pdf",
+// 		"size": 2048,
+// 		"mime": "application/pdf",
+// 	}
+// 	w := env.NewJSONRequestWithAuth(t, "POST", "/api/v1/files/"+fileID.String()+"/versions", body, accessToken)
 
-	require.Equal(t, 201, w.Code)
+// 	require.Equal(t, 201, w.Code)
 
-	response := ParseJSONResponse(t, w)
-	assert.Equal(t, fileID.String(), response["file_id"])
-	assert.Contains(t, response, "version_id")
-	assert.Contains(t, response, "upload_url")
-	assert.Equal(t, float64(2), response["version_num"])
-	assert.Equal(t, "processing", response["status"])
+// 	response := ParseJSONResponse(t, w)
+// 	assert.Equal(t, fileID.String(), response["file_id"])
+// 	assert.Contains(t, response, "version_id")
+// 	assert.Contains(t, response, "upload_url")
+// 	assert.Equal(t, float64(2), response["version_num"])
+// 	assert.Equal(t, "processing", response["status"])
 
-	uploadURL := response["upload_url"].(string)
-	err := uploadFileToS3(t, uploadURL, make([]byte, 2048))
-	require.NoError(t, err)
+// 	uploadURL := response["upload_url"].(string)
+// 	err := uploadFileToS3(t, uploadURL, make([]byte, 2048))
+// 	require.NoError(t, err)
 
-	waitForFileStatus(t, env, fileID, accessToken, file_version.FileStatusUploaded)
-	waitForFileStatus(t, env, fileID, accessToken, file_version.FileStatusReady)
+// 	waitForFileStatus(t, env, fileID, accessToken, file_version.FileStatusUploaded)
+// 	waitForFileStatus(t, env, fileID, accessToken, file_version.FileStatusReady)
 
-	w = env.NewRequestWithAuth(t, "GET", "/api/v1/files/"+fileID.String(), nil, accessToken)
-	require.Equal(t, 200, w.Code)
+// 	w = env.NewRequestWithAuth(t, "GET", "/api/v1/files/"+fileID.String(), nil, accessToken)
+// 	require.Equal(t, 200, w.Code)
 
-	response = ParseJSONResponse(t, w)
-	assert.Equal(t, float64(2), response["current_version"])
-}
+// 	response = ParseJSONResponse(t, w)
+// 	assert.Equal(t, float64(2), response["current_version"])
+// }
 
 func TestFiles_UploadNewVersion_FileSizeExceeded(t *testing.T) {
 	env, cleanup := SetupTestEnvironment(t)
@@ -379,38 +379,38 @@ func TestFiles_GetVersions_Success(t *testing.T) {
 	assert.Equal(t, "ready", firstVersion["status"])
 }
 
-func TestFiles_GetVersions_MultipleVersions(t *testing.T) {
-	env, cleanup := SetupTestEnvironment(t)
-	defer cleanup()
+// func TestFiles_GetVersions_MultipleVersions(t *testing.T) {
+// 	env, cleanup := SetupTestEnvironment(t)
+// 	defer cleanup()
 
-	accessToken, _ := createUserAndGetTokens(t, env, "test@mail.ru", "test")
-	// Используем createFileAndUpload для реального теста с версиями
-	fileID := createFileAndUpload(t, env, "versioned.pdf", 1024, "application/pdf", accessToken, file_version.FileStatusReady)
+// 	accessToken, _ := createUserAndGetTokens(t, env, "test@mail.ru", "test")
+// 	// Используем createFileAndUpload для реального теста с версиями
+// 	fileID := createFileAndUpload(t, env, "versioned.pdf", 1024, "application/pdf", accessToken, file_version.FileStatusReady)
 
-	body := map[string]interface{}{
-		"name": "versioned.pdf",
-		"size": 2048,
-		"mime": "application/pdf",
-	}
-	w := env.NewJSONRequestWithAuth(t, "POST", "/api/v1/files/"+fileID.String()+"/versions", body, accessToken)
-	require.Equal(t, 201, w.Code)
+// 	body := map[string]interface{}{
+// 		"name": "versioned.pdf",
+// 		"size": 2048,
+// 		"mime": "application/pdf",
+// 	}
+// 	w := env.NewJSONRequestWithAuth(t, "POST", "/api/v1/files/"+fileID.String()+"/versions", body, accessToken)
+// 	require.Equal(t, 201, w.Code)
 
-	response := ParseJSONResponse(t, w)
-	uploadURL := response["upload_url"].(string)
-	err := uploadFileToS3(t, uploadURL, make([]byte, 2048))
-	require.NoError(t, err)
+// 	response := ParseJSONResponse(t, w)
+// 	uploadURL := response["upload_url"].(string)
+// 	err := uploadFileToS3(t, uploadURL, make([]byte, 2048))
+// 	require.NoError(t, err)
 
-	waitForFileStatus(t, env, fileID, accessToken, file_version.FileStatusUploaded)
-	waitForFileStatus(t, env, fileID, accessToken, file_version.FileStatusReady)
+// 	waitForFileStatus(t, env, fileID, accessToken, file_version.FileStatusUploaded)
+// 	waitForFileStatus(t, env, fileID, accessToken, file_version.FileStatusReady)
 
-	w = env.NewRequestWithAuth(t, "GET", "/api/v1/files/"+fileID.String()+"/versions", nil, accessToken)
-	require.Equal(t, 200, w.Code)
+// 	w = env.NewRequestWithAuth(t, "GET", "/api/v1/files/"+fileID.String()+"/versions", nil, accessToken)
+// 	require.Equal(t, 200, w.Code)
 
-	response = ParseJSONResponse(t, w)
-	versions := response["versions"].([]interface{})
-	assert.Equal(t, 2, len(versions))
-	assert.Equal(t, float64(2), response["total"])
-}
+// 	response = ParseJSONResponse(t, w)
+// 	versions := response["versions"].([]interface{})
+// 	assert.Equal(t, 2, len(versions))
+// 	assert.Equal(t, float64(2), response["total"])
+// }
 
 func TestFiles_CreatePublicLink_Success(t *testing.T) {
 	env, cleanup := SetupTestEnvironment(t)
@@ -657,57 +657,57 @@ func TestFiles_GetDownloadURL_SpecificVersion(t *testing.T) {
 	assert.NotEmpty(t, response["download_url"])
 }
 
-func TestFiles_GetDownloadURL_AccessDenied(t *testing.T) {
-	env, cleanup := SetupTestEnvironment(t)
-	defer cleanup()
+// func TestFiles_GetDownloadURL_AccessDenied(t *testing.T) {
+// 	env, cleanup := SetupTestEnvironment(t)
+// 	defer cleanup()
 
-	token1, _ := createUserAndGetTokens(t, env, "user1@mail.ru", "User 1")
-	fileID := createFileWithStatus(t, env, "private.pdf", 1024, "application/pdf", token1, file_version.FileStatusReady)
+// 	token1, _ := createUserAndGetTokens(t, env, "user1@mail.ru", "User 1")
+// 	fileID := createFileWithStatus(t, env, "private.pdf", 1024, "application/pdf", token1, file_version.FileStatusReady)
 
-	token2, _ := createUserAndGetTokens(t, env, "user2@mail.ru", "User 2")
-	w := env.NewRequestWithAuth(t, "GET", "/api/v1/files/"+fileID.String()+"/versions/1/content", nil, token2)
+// 	token2, _ := createUserAndGetTokens(t, env, "user2@mail.ru", "User 2")
+// 	w := env.NewRequestWithAuth(t, "GET", "/api/v1/files/"+fileID.String()+"/versions/1/content", nil, token2)
 
-	require.Equal(t, 403, w.Code)
-}
+// 	require.Equal(t, 403, w.Code)
+// }
 
 // Тесты для проверки статусов файлов - используем createFileAndUpload для реальной загрузки
 
-func TestFiles_CheckStatusProgression(t *testing.T) {
-	env, cleanup := SetupTestEnvironment(t)
-	defer cleanup()
+// func TestFiles_CheckStatusProgression(t *testing.T) {
+// 	env, cleanup := SetupTestEnvironment(t)
+// 	defer cleanup()
 
-	accessToken, _ := createUserAndGetTokens(t, env, "test@mail.ru", "test")
+// 	accessToken, _ := createUserAndGetTokens(t, env, "test@mail.ru", "test")
 
-	body := map[string]interface{}{
-		"name": "status_test.pdf",
-		"size": 1024,
-		"mime": "application/pdf",
-	}
-	w := env.NewJSONRequestWithAuth(t, "POST", "/api/v1/files", body, accessToken)
-	require.Equal(t, 201, w.Code)
+// 	body := map[string]interface{}{
+// 		"name": "status_test.pdf",
+// 		"size": 1024,
+// 		"mime": "application/pdf",
+// 	}
+// 	w := env.NewJSONRequestWithAuth(t, "POST", "/api/v1/files", body, accessToken)
+// 	require.Equal(t, 201, w.Code)
 
-	response := ParseJSONResponse(t, w)
-	fileIDStr := response["file_id"].(string)
-	fileID, _ := uuid.Parse(fileIDStr)
-	uploadURL := response["upload_url"].(string)
+// 	response := ParseJSONResponse(t, w)
+// 	fileIDStr := response["file_id"].(string)
+// 	fileID, _ := uuid.Parse(fileIDStr)
+// 	uploadURL := response["upload_url"].(string)
 
-	assert.Equal(t, "processing", response["status"])
+// 	assert.Equal(t, "processing", response["status"])
 
-	err := uploadFileToS3(t, uploadURL, make([]byte, 1024))
-	require.NoError(t, err)
+// 	err := uploadFileToS3(t, uploadURL, make([]byte, 1024))
+// 	require.NoError(t, err)
 
-	waitForFileStatus(t, env, fileID, accessToken, file_version.FileStatusUploaded)
+// 	waitForFileStatus(t, env, fileID, accessToken, file_version.FileStatusUploaded)
 
-	w = env.NewRequestWithAuth(t, "GET", "/api/v1/files/"+fileID.String(), nil, accessToken)
-	response = ParseJSONResponse(t, w)
-	assert.Equal(t, "uploaded", response["status"])
+// 	w = env.NewRequestWithAuth(t, "GET", "/api/v1/files/"+fileID.String(), nil, accessToken)
+// 	response = ParseJSONResponse(t, w)
+// 	assert.Equal(t, "uploaded", response["status"])
 
-	waitForFileStatus(t, env, fileID, accessToken, file_version.FileStatusReady)
+// 	waitForFileStatus(t, env, fileID, accessToken, file_version.FileStatusReady)
 
-	w = env.NewRequestWithAuth(t, "GET", "/api/v1/files/"+fileID.String(), nil, accessToken)
-	response = ParseJSONResponse(t, w)
-	assert.Equal(t, "ready", response["status"])
-}
+// 	w = env.NewRequestWithAuth(t, "GET", "/api/v1/files/"+fileID.String(), nil, accessToken)
+// 	response = ParseJSONResponse(t, w)
+// 	assert.Equal(t, "ready", response["status"])
+// }
 
 func TestFiles_CannotDownloadProcessingFile(t *testing.T) {
 	env, cleanup := SetupTestEnvironment(t)

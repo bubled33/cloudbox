@@ -16,6 +16,7 @@ import (
 	"github.com/yourusername/cloud-file-storage/internal/api"
 	auth_handlers "github.com/yourusername/cloud-file-storage/internal/api/handlers/auth"
 	files_handler "github.com/yourusername/cloud-file-storage/internal/api/handlers/files"
+	metrics_handler "github.com/yourusername/cloud-file-storage/internal/api/handlers/metrics"
 	users_handler "github.com/yourusername/cloud-file-storage/internal/api/handlers/users"
 	"github.com/yourusername/cloud-file-storage/internal/app"
 	auth_service "github.com/yourusername/cloud-file-storage/internal/app/auth"
@@ -31,6 +32,7 @@ import (
 	"github.com/yourusername/cloud-file-storage/internal/infra/smtp"
 	"github.com/yourusername/cloud-file-storage/internal/infra/storage"
 	"github.com/yourusername/cloud-file-storage/internal/test"
+	"github.com/yourusername/cloud-file-storage/internal/workers"
 )
 
 type TestEnv struct {
@@ -48,6 +50,10 @@ type TestEnv struct {
 	FileCommandRepo        *db.FileCommandRepository
 	FileVersionCommandRepo *db.FileVersionCommandRepository
 	UOW                    *app.UnitOfWork
+
+	// Управление воркерами
+	WorkerCtx     context.Context
+	CancelWorkers context.CancelFunc
 }
 
 func SetupTestEnvironment(t *testing.T) (*TestEnv, func()) {
@@ -92,10 +98,12 @@ func SetupTestEnvironment(t *testing.T) (*TestEnv, func()) {
 	uow := app.NewUnitOfWork(testDB.DB)
 
 	eventWriter := testKafka.NewWriter("events")
+	eventReader := testKafka.NewReader("events", "test-events-group")
 	previewWriter := testKafka.NewWriter("previews")
 	previewReader := testKafka.NewReader("previews", "test-preview-group")
 
 	eventProducer := queue.NewKafkaEventProducer(eventWriter)
+	eventConsumer := queue.NewKafkaEventConsumer(eventReader)
 	previewConsumer := queue.NewKafkaPreviewConsumer(previewReader)
 	previewProducer := queue.NewKafkaPreviewProducer(previewWriter)
 
@@ -120,6 +128,7 @@ func SetupTestEnvironment(t *testing.T) (*TestEnv, func()) {
 		eventCommandRepository,
 		eventProducer,
 		"test-instance",
+		*uow,
 	)
 
 	magicLinkService := magic_link_service.NewMagicLinkService(
@@ -184,8 +193,27 @@ func SetupTestEnvironment(t *testing.T) (*TestEnv, func()) {
 	authHandler := auth_handlers.NewAuthHandler(authService, sessionService)
 	userHandler := users_handler.NewUserHandler(userService)
 	fileHandler := files_handler.NewFileHandler(versionService, fileService, publicLinkService)
+	metricHandler := metrics_handler.NewMetricsHandler()
 
-	server := api.NewServer(authHandler, userHandler, fileHandler, authService)
+	server := api.NewServer(authHandler, userHandler, fileHandler, metricHandler, authService)
+
+	// Создаем контекст для управления воркерами
+	workerCtx, cancelWorkers := context.WithCancel(ctx)
+
+	// Создаем и запускаем воркеры
+	previewWorker := workers.NewPreviewWorker(s3Storage, previewConsumer, versionService)
+	fileChecker := workers.NewFileChecker(versionService, *uow, s3Storage, time.Second*1)
+	metricWorker := workers.NewMetricsWorker(eventConsumer, time.Second*1)
+	publishWorker := workers.NewPublishEventsWorker(eventService, time.Second*1, 5, 3)
+
+	// Запускаем воркеры в фоне
+	go previewWorker.Handle(workerCtx)
+	go fileChecker.Start(workerCtx)
+	go publishWorker.Start(workerCtx)
+	go metricWorker.Start(workerCtx)
+
+	// Даем воркерам время на инициализацию
+	time.Sleep(100 * time.Millisecond)
 
 	env := &TestEnv{
 		Server:                 server,
@@ -200,9 +228,18 @@ func SetupTestEnvironment(t *testing.T) (*TestEnv, func()) {
 		FileCommandRepo:        fileCommandRepo,
 		FileVersionCommandRepo: fileVersionCommandRepo,
 		UOW:                    uow,
+		WorkerCtx:              workerCtx,
+		CancelWorkers:          cancelWorkers,
 	}
 
 	cleanup := func() {
+		// Останавливаем воркеры
+		cancelWorkers()
+
+		// Даем время воркерам на graceful shutdown
+		time.Sleep(200 * time.Millisecond)
+
+		// Закрываем ресурсы
 		testDB.Terminate(ctx)
 		testKafka.Terminate(ctx)
 		testS3.Terminate(ctx)

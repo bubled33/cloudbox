@@ -1188,6 +1188,23 @@ const docTemplate = `{
                 }
             }
         },
+        "/metrics": {
+            "get": {
+                "description": "Returns Prometheus metrics for monitoring",
+                "produces": [
+                    "text/plain"
+                ],
+                "tags": [
+                    "metrics"
+                ],
+                "summary": "Get Prometheus metrics",
+                "responses": {
+                    "200": {
+                        "description": "Prometheus metrics in text format"
+                    }
+                }
+            }
+        },
         "/public-links/{file_id}": {
             "post": {
                 "security": [
@@ -2167,16 +2184,23 @@ const docTemplate = `{
                 }
             }
         }
+    },
+    "securityDefinitions": {
+        "BearerAuth": {
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        }
     }
 }`
 
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
-	Version:          "",
+	Version:          "1.0",
 	Host:             "",
-	BasePath:         "",
+	BasePath:         "/api/v1",
 	Schemes:          []string{},
-	Title:            "",
+	Title:            "Cloud file storage",
 	Description:      "",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,

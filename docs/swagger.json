@@ -1,8 +1,11 @@
 {
     "swagger": "2.0",
     "info": {
-        "contact": {}
+        "title": "Cloud file storage",
+        "contact": {},
+        "version": "1.0"
     },
+    "basePath": "/api/v1",
     "paths": {
         "/auth/sessions": {
             "get": {
@@ -1177,6 +1180,23 @@
                 }
             }
         },
+        "/metrics": {
+            "get": {
+                "description": "Returns Prometheus metrics for monitoring",
+                "produces": [
+                    "text/plain"
+                ],
+                "tags": [
+                    "metrics"
+                ],
+                "summary": "Get Prometheus metrics",
+                "responses": {
+                    "200": {
+                        "description": "Prometheus metrics in text format"
+                    }
+                }
+            }
+        },
         "/public-links/{file_id}": {
             "post": {
                 "security": [
@@ -2155,6 +2175,13 @@
                     "example": "2025-11-04T12:00:00Z"
                 }
             }
+        }
+    },
+    "securityDefinitions": {
+        "BearerAuth": {
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
         }
     }
 }

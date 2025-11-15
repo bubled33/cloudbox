@@ -12,6 +12,7 @@ import (
 	"github.com/yourusername/cloud-file-storage/internal/api"
 	auth_handlers "github.com/yourusername/cloud-file-storage/internal/api/handlers/auth"
 	files_handler "github.com/yourusername/cloud-file-storage/internal/api/handlers/files"
+	metrics_handler "github.com/yourusername/cloud-file-storage/internal/api/handlers/metrics"
 	users_handler "github.com/yourusername/cloud-file-storage/internal/api/handlers/users"
 	"github.com/yourusername/cloud-file-storage/internal/app"
 	auth_service "github.com/yourusername/cloud-file-storage/internal/app/auth"
@@ -28,9 +29,39 @@ import (
 	"github.com/yourusername/cloud-file-storage/internal/infra/smtp"
 	"github.com/yourusername/cloud-file-storage/internal/infra/storage"
 	"github.com/yourusername/cloud-file-storage/internal/workers"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
+func initTracer() func() {
+	exporter, err := stdouttrace.New(
+		stdouttrace.WithPrettyPrint(),
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	tp := sdktrace.NewTracerProvider(
+		sdktrace.WithBatcher(exporter),
+	)
+	otel.SetTracerProvider(tp)
+
+	return func() {
+		_ = tp.Shutdown(context.Background())
+	}
+}
+
+// @title Cloud file storage
+// @version 1.0
+// @BasePath /api/v1
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
 func main() {
+	shutdown := initTracer()
+	defer shutdown()
+
 	if err := godotenv.Load(".env"); err != nil {
 		log.Printf("Warning: .env file not found: %v", err)
 	}
@@ -51,7 +82,9 @@ func main() {
 	defer dbConn.Close()
 
 	writer, reader := queue.NewMockQueue()
-	eventProducer := queue.NewKafkaEventProducer(&queue.MockWriter{})
+	eventWriter, eventReader := queue.NewMockQueue()
+	eventProducer := queue.NewKafkaEventProducer(eventWriter)
+	eventConsuer := queue.NewKafkaEventConsumer(eventReader)
 	previewConsumer := queue.NewKafkaPreviewConsumer(reader)
 	previewProducer := queue.NewKafkaPreviewProducer(writer)
 
@@ -92,7 +125,7 @@ func main() {
 		cfg.Immutable.SMTP.Password,
 	)
 	fmt.Println("Key ", cfg.Immutable.S3.SecretAccessKey)
-	eventService := event_service.NewEventService(eventQueryRepository, eventCommandRepository, eventProducer, "1")
+	eventService := event_service.NewEventService(eventQueryRepository, eventCommandRepository, eventProducer, "1", *uow)
 	magicLinkService := magic_link_service.NewMagicLinkService(magicLinkQueryRepo, magicLinkCommandRepo, eventService, *uow)
 	sessionService := session_service.NewSessionService(sessionQueryRepo, sessionCommandRepo, eventService, *uow)
 	versionService := file_version_service.NewFileVersionService(fileQueryRepo, fileCommandRepo, fileVersionQueryRepo, fileVersionCommandRepo, s3, previewConsumer, previewProducer, eventService, *uow)
@@ -109,15 +142,19 @@ func main() {
 
 	previewWorker := workers.NewPreviewWorker(s3, previewConsumer, versionService)
 	fileChecker := workers.NewFileChecker(versionService, *uow, s3, time.Second*50)
+	metricWorker := workers.NewMetricsWorker(eventConsuer, time.Second*5)
+	publishWorker := workers.NewPublishEventsWorker(eventService, time.Second*5, 5, 3)
 
 	authHandler := auth_handlers.NewAuthHandler(authService, sessionService)
 	userHandler := users_handler.NewUserHandler(userService)
 	fileHandler := files_handler.NewFileHandler(versionService, fileService, publicLinkService)
-
-	server := api.NewServer(authHandler, userHandler, fileHandler, authService)
+	metricHandler := metrics_handler.NewMetricsHandler()
+	server := api.NewServer(authHandler, userHandler, fileHandler, metricHandler, authService)
 
 	go previewWorker.Handle(context.Background())
 	go fileChecker.Start(context.Background())
+	go publishWorker.Start(context.Background())
+	go metricWorker.Start(context.Background())
 
 	if err := server.Run(cfg.Immutable.HTTP.Addr); err != nil {
 		log.Fatalf("Server failed to start: %v", err)

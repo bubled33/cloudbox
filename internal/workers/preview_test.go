@@ -51,7 +51,7 @@ func TestPreviewWorker_Handle(t *testing.T) {
 
 	mockService := &file_version_service.MockFileVersionService{}
 
-	worker := NewPreviewWorker(mockStorage, mockConsumer, mockService)
+	worker := NewPreviewWorker(mockStorage, mockConsumer, mockService, WithRetryDelay(10*time.Millisecond))
 
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
